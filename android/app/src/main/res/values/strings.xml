@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">BunkCalc</string>
+    <string name="title_activity_main">BunkCalc</string>
+    <string name="package_name">com.bunkcalc.app</string>
+    <string name="custom_url_scheme">com.bunkcalc.app</string>
+</resources>

@@ -1,0 +1,42 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Environment variables — never commit secrets
+.env
+.env.*
+!.env.example
+
+# Android build secrets
+# local.properties contains the Android SDK path (machine-specific, not a secret per se,
+# but it is machine-specific and should never be committed)
+android/local.properties
+
+# Android signing keystores — NEVER commit these
+*.jks
+*.keystore
+android/app/release/
+
+# OS files
+Thumbs.db

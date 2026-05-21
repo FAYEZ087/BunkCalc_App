@@ -1,0 +1,332 @@
+import React, { useState } from 'react';
+import { useSubjects } from '../store/useSubjects';
+import { useSettings } from '../store/useSettings';
+import { v4 as uuidv4 } from 'uuid';
+import type { Subject } from '../lib/types';
+import { sanitizeName } from '../lib/validation';
+import { AppModal } from '../components/AppModal';
+
+const Setup: React.FC = () => {
+  const { addSubject } = useSubjects();
+  const { settings, setSettings } = useSettings();
+  
+  const [step, setStep] = useState(1);
+  const [tempSubjects, setTempSubjects] = useState<Subject[]>([]);
+  
+  // Current subject being added
+  const [name, setName] = useState('');
+  const [credits, setCredits] = useState(3);
+  const [labMultiplier, setLabMultiplier] = useState<1 | 2>(1);
+  const [useCustomTime, setUseCustomTime] = useState(false);
+  const [globalSlot, setGlobalTime] = useState('09:00');
+  const [scheduleMap, setScheduleMap] = useState<Record<number, string>>({});
+
+  // Modal Dialog state
+  const [modal, setModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    type?: 'error' | 'alert' | 'success' | 'confirm';
+    confirmText?: string;
+    cancelText?: string;
+    onConfirm: () => void;
+    onCancel?: () => void;
+  } | null>(null);
+
+  const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+  const handleAddSubject = () => {
+    const days = Object.keys(scheduleMap).map(Number);
+    const sanitizedName = sanitizeName(name);
+    if (!sanitizedName || days.length === 0) return;
+    
+    // Check for duplicate subject names
+    const nameExists = tempSubjects.some(s => s.name.toLowerCase().trim() === sanitizedName.toLowerCase().trim());
+    if (nameExists) {
+      setModal({
+        isOpen: true,
+        title: "Duplicate Subject",
+        message: `A subject named "${sanitizedName}" has already been added.`,
+        type: "error",
+        confirmText: "OK",
+        onConfirm: () => setModal(null)
+      });
+      return;
+    }
+    
+    const newSub: Subject = {
+      id: uuidv4(),
+      name: sanitizedName,
+      credits,
+      threshold: settings.globalThreshold,
+      labMultiplier,
+      schedule: days.map(day => ({ 
+        day, 
+        slot: useCustomTime ? scheduleMap[day] : globalSlot 
+      })),
+    };
+    
+    setTempSubjects([...tempSubjects, newSub]);
+    
+    // Reset form
+    setName('');
+    setCredits(3);
+    setLabMultiplier(1);
+    setUseCustomTime(false);
+    setGlobalTime('09:00');
+    setScheduleMap({});
+  };
+
+  const toggleDay = (idx: number) => {
+    const newMap = { ...scheduleMap };
+    if (newMap[idx] !== undefined) {
+      delete newMap[idx];
+    } else {
+      newMap[idx] = globalSlot;
+    }
+    setScheduleMap(newMap);
+  };
+
+  const updateTime = (idx: number, time: string) => {
+    setScheduleMap({ ...scheduleMap, [idx]: time });
+  };
+
+  const handleFinish = () => {
+    tempSubjects.forEach(s => addSubject(s));
+  };
+
+  return (
+    <div className="min-h-screen bg-white dark:bg-slate-950 text-slate-900 dark:text-white p-6 pb-12 flex flex-col transition-colors duration-300">
+      <header className="mb-8">
+        <h1 className="text-3xl font-black text-blue-600 dark:text-blue-500 italic uppercase">BunkCalc</h1>
+        <p className="text-slate-500 dark:text-slate-400 text-xs font-bold tracking-widest uppercase">Semester Setup</p>
+      </header>
+
+      {step === 1 && (
+        <div className="flex-1 animate-in fade-in slide-in-from-right duration-300">
+          <div className="mb-8">
+            <h2 className="text-xl font-bold mb-1">Academic Preferences</h2>
+            <p className="text-xs text-slate-500 italic">These can be changed later in settings.</p>
+          </div>
+
+          <div className="space-y-6 bg-slate-50 dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800">
+            <div>
+              <label className="block text-slate-500 dark:text-slate-500 text-[10px] font-black uppercase tracking-widest mb-3">Attendance Threshold (%)</label>
+              <select 
+                value={Math.round(settings.globalThreshold * 100)}
+                onChange={(e) => setSettings({ ...settings, globalThreshold: Number(e.target.value) / 100 })}
+                className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4 outline-none focus:border-blue-500 text-slate-900 dark:text-white font-bold"
+              >
+                {[60, 65, 70, 75, 80, 85, 90].map(val => (
+                  <option key={val} value={val}>{val}%</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-slate-500 dark:text-slate-500 text-[10px] font-black uppercase tracking-widest mb-3">Semester End Date</label>
+              <input 
+                type="date" 
+                value={settings.semesterEndDate.split('T')[0]}
+                onChange={(e) => setSettings({ ...settings, semesterEndDate: new Date(e.target.value).toISOString() })}
+                className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4 outline-none focus:border-blue-500 text-slate-900 dark:text-white font-bold"
+              />
+            </div>
+          </div>
+
+          <button 
+            onClick={() => {
+              const endDate = new Date(settings.semesterEndDate);
+              const today = new Date();
+              today.setHours(0, 0, 0, 0);
+              if (endDate <= today) {
+                setModal({
+                  isOpen: true,
+                  title: "Invalid Semester End Date",
+                  message: "Semester end date must be in the future.",
+                  type: "error",
+                  confirmText: "OK",
+                  onConfirm: () => setModal(null)
+                });
+                return;
+              }
+              setStep(2);
+            }}
+            className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black uppercase tracking-widest text-sm shadow-xl shadow-blue-500/20 active:scale-95 transition-all mt-10"
+          >
+            Next Step
+          </button>
+        </div>
+      )}
+
+      {step === 2 && (
+        <div className="flex-1 animate-in fade-in slide-in-from-right duration-300 max-h-[80vh] overflow-y-auto pr-1">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-xl font-bold">Add Atleast One Subject to Begin</h2>
+            <button 
+              onClick={() => setStep(1)}
+              className="text-slate-500 text-xs font-bold uppercase tracking-widest flex items-center gap-1"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15 19l-7-7 7-7" />
+              </svg>
+              Back
+            </button>
+          </div>
+          
+          <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 mb-8">
+            <div className="space-y-6">
+              <div>
+                <label className="block text-slate-500 text-[10px] font-bold uppercase tracking-widest mb-2">Subject Name</label>
+                <input 
+                  placeholder="e.g. Data Structures" 
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  maxLength={40}
+                  className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3 outline-none focus:border-blue-500 transition-colors text-slate-900 dark:text-white"
+                />
+              </div>
+              
+              <div className="flex gap-4">
+                <div className="flex-1">
+                  <label className="block text-slate-500 text-[10px] font-bold uppercase tracking-widest mb-2">Credits</label>
+                  <select 
+                    value={credits}
+                    onChange={(e) => setCredits(Number(e.target.value))}
+                    className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-3 rounded-xl text-sm outline-none focus:border-blue-500 text-slate-900 dark:text-white"
+                  >
+                    {[1, 2, 3, 4, 5].map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div className="flex-1">
+                  <label className="block text-slate-500 text-[10px] font-bold uppercase tracking-widest mb-2">Type</label>
+                  <select 
+                    value={labMultiplier}
+                    onChange={(e) => setLabMultiplier(Number(e.target.value) as 1 | 2)}
+                    className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-3 rounded-xl text-sm outline-none focus:border-blue-500 text-slate-900 dark:text-white"
+                  >
+                    <option value={1}>Theory</option>
+                    <option value={2}>Lab (x2)</option>
+                  </select>
+                </div>
+              </div>
+
+              {!useCustomTime && (
+                <div>
+                  <label className="block text-slate-500 text-[10px] font-bold uppercase tracking-widest mb-2">Class Time</label>
+                  <input 
+                    type="time"
+                    value={globalSlot}
+                    onChange={(e) => setGlobalTime(e.target.value)}
+                    className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-3 rounded-xl text-sm outline-none focus:border-blue-500 text-slate-900 dark:text-white font-bold"
+                  />
+                </div>
+              )}
+
+              <div className="flex items-center justify-between bg-white dark:bg-slate-800/50 p-3 rounded-xl border border-slate-100 dark:border-slate-800">
+                <div>
+                  <p className="text-sm font-bold text-slate-900 dark:text-white">Custom timing</p>
+                  <p className="text-[10px] text-slate-500 italic">Diff times on diff days</p>
+                </div>
+                <button 
+                  onClick={() => setUseCustomTime(!useCustomTime)}
+                  className={`w-10 h-5 rounded-full transition-colors relative ${useCustomTime ? 'bg-blue-600' : 'bg-slate-300 dark:bg-slate-700'}`}
+                >
+                  <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all ${useCustomTime ? 'left-5' : 'left-1'}`}></div>
+                </button>
+              </div>
+
+              <div>
+                <label className="block text-slate-500 text-[10px] font-bold uppercase tracking-widest mb-2">Class Schedule</label>
+                <div className="grid grid-cols-4 gap-2">
+                  {daysOfWeek.map((day, idx) => {
+                    const isActive = scheduleMap[idx] !== undefined;
+                    return (
+                      <button
+                        key={day}
+                        onClick={() => toggleDay(idx)}
+                        className={`py-2 rounded-lg text-[10px] font-black transition-all ${
+                          isActive 
+                            ? 'bg-blue-600 text-white shadow-lg' 
+                            : 'bg-white dark:bg-slate-800 text-slate-400 dark:text-slate-500 border border-slate-100 dark:border-transparent'
+                        }`}
+                      >
+                        {day}
+                      </button>
+                    );
+                  })}
+                </div>
+                
+                {useCustomTime && Object.keys(scheduleMap).length > 0 && (
+                  <div className="mt-4 space-y-2 max-h-32 overflow-y-auto pr-1">
+                    {Object.keys(scheduleMap).map(Number).map(dayIdx => (
+                      <div key={dayIdx} className="flex items-center justify-between gap-4">
+                        <span className="text-xs font-bold text-slate-500 w-8">{daysOfWeek[dayIdx]}</span>
+                        <input 
+                          type="time"
+                          value={scheduleMap[dayIdx]}
+                          onChange={(e) => updateTime(dayIdx, e.target.value)}
+                          className="flex-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-1.5 text-xs font-bold outline-none text-slate-900 dark:text-white"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <button 
+                onClick={handleAddSubject}
+                disabled={!name || Object.keys(scheduleMap).length === 0}
+                className="w-full bg-slate-200 dark:bg-slate-800 py-3 rounded-xl text-xs font-black uppercase text-blue-600 dark:text-blue-400 border border-blue-500/20 disabled:opacity-50"
+              >
+                + Add Subject
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-2 mb-8">
+            {tempSubjects.length > 0 && <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Added Subjects</p>}
+            {tempSubjects.map((s, i) => (
+              <div key={i} className="flex justify-between items-center bg-slate-50 dark:bg-slate-900 p-3 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm animate-in fade-in slide-in-from-bottom duration-200">
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-sm truncate">{s.name}</p>
+                  <p className="text-[10px] text-slate-500">{s.schedule.length} sessions per week</p>
+                </div>
+                <button 
+                  onClick={() => setTempSubjects(tempSubjects.filter((_, idx) => idx !== i))}
+                  className="text-red-500 p-2"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            ))}
+          </div>
+
+          <button 
+            disabled={tempSubjects.length === 0}
+            onClick={handleFinish}
+            className="w-full bg-green-600 text-white py-5 rounded-2xl font-black uppercase tracking-widest text-sm shadow-xl shadow-green-500/20 active:scale-95 transition-all disabled:opacity-50 mt-auto"
+          >
+            Finish & Launch
+          </button>
+        </div>
+      )}
+
+      {modal && (
+        <AppModal
+          isOpen={modal.isOpen}
+          title={modal.title}
+          message={modal.message}
+          type={modal.type}
+          confirmText={modal.confirmText}
+          cancelText={modal.cancelText}
+          onConfirm={modal.onConfirm}
+          onCancel={modal.onCancel}
+        />
+      )}
+    </div>
+  );
+};
+
+export default Setup;

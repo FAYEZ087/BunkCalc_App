@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <!--
+      Content Security Policy for BunkCalc (offline Capacitor app).
+      - script-src 'self': Only scripts bundled with the app are allowed.
+      - style-src 'self' 'unsafe-inline': Inline styles needed by Tailwind CSS and html2canvas.
+      - img-src 'self' data: blob:: data URIs for share card canvas, blobs for file sharing.
+      - media-src 'self': Video for splash animation.
+      - connect-src 'self': No external network calls allowed (app is fully offline).
+      - object-src 'none': Blocks plugin/flash injection attacks.
+      - base-uri 'self': Prevents base tag hijacking.
+    -->
+    <meta http-equiv="Content-Security-Policy"
+      content="default-src 'self';
+               script-src 'self';
+               style-src 'self' 'unsafe-inline';
+               img-src 'self' data: blob:;
+               media-src 'self';
+               connect-src 'self';
+               object-src 'none';
+               base-uri 'self';" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#020617" />
+    <meta name="description" content="Track your college attendance, manage bunk safety margins, and plan classes offline with BunkCalc." />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BunkCalc</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

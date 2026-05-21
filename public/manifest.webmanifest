@@ -1,0 +1,28 @@
+{
+  "short_name": "BunkCalc",
+  "name": "BunkCalc - Smart Attendance & Bunk Planner",
+  "description": "Never lose track of your attendance. Calculate bunks, plan schedule, and set smart alerts.",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#0f172a",
+  "theme_color": "#2563eb",
+  "display": "standalone",
+  "orientation": "portrait",
+  "categories": [
+    "education",
+    "utilities"
+  ]
+}
