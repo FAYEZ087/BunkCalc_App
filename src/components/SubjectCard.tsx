@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import type { Subject } from '../lib/types';
 import { useAttendance } from '../store/useAttendance';
 import { useSettings } from '../store/useSettings';
@@ -17,7 +17,9 @@ const SubjectCard: React.FC<Props> = ({ subject, onClick, onEdit, onDelete }) =>
   const { records } = useAttendance();
   const { settings } = useSettings();
   const [showMenu, setShowMenu] = React.useState(false);
-  const stats = calculateSubjectStats(subject, records);
+  const stats = useMemo(() => calculateSubjectStats(subject, records, settings.semesterEndDate, settings.holidays), [subject, records, settings.semesterEndDate, settings.holidays]);
+
+  const isRecoveryMode = stats.bunkBudget < 0;
 
   const handleCardClick = async () => {
     if (settings.hapticsEnabled) {
@@ -46,12 +48,28 @@ const SubjectCard: React.FC<Props> = ({ subject, onClick, onEdit, onDelete }) =>
   return (
     <div 
       onClick={handleCardClick}
-      className="bg-slate-50 dark:bg-slate-900 rounded-xl p-4 shadow-md dark:shadow-lg border border-slate-200 dark:border-slate-800 active:scale-[0.98] transition-all cursor-pointer relative"
+      className={`rounded-xl p-4 shadow-md dark:shadow-lg border active:scale-[0.98] transition-all cursor-pointer relative ${
+        isRecoveryMode 
+          ? 'bg-red-500/10 dark:bg-red-950/30 border-red-500/40' 
+          : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800'
+      }`}
     >
       <div className="flex justify-between items-start mb-4">
         <div className="flex-1 min-w-0 pr-4">
-          <h3 className="text-lg font-bold truncate text-slate-900 dark:text-white">{subject.name}</h3>
-          <p className="text-slate-500 dark:text-slate-400 text-sm">{subject.credits} Credits</p>
+          <div className="flex items-center gap-2">
+            <h3 className="text-lg font-bold truncate text-slate-900 dark:text-white">{subject.name}</h3>
+            {subject.isLab && (
+              <span className="bg-purple-500/10 text-purple-600 dark:text-purple-400 text-[9px] font-black px-2 py-0.5 rounded uppercase tracking-wider shrink-0 border border-purple-500/20">
+                Lab
+              </span>
+            )}
+            {isRecoveryMode && (
+              <span className="bg-red-600 text-white text-[9px] font-black px-2 py-0.5 rounded uppercase tracking-wider shrink-0">
+                DANGER
+              </span>
+            )}
+          </div>
+          <p className="text-slate-500 dark:text-slate-400 text-sm">{subject.credits} Credits • {stats.remainingClasses} remaining</p>
         </div>
         
         <div className="flex items-center gap-2">
@@ -101,10 +119,21 @@ const SubjectCard: React.FC<Props> = ({ subject, onClick, onEdit, onDelete }) =>
           <p className="text-xl font-bold text-slate-900 dark:text-white">{stats.attendedCount} / {stats.totalClasses}</p>
         </div>
         <div className="bg-white dark:bg-slate-800 rounded-lg p-3 border border-slate-100 dark:border-transparent">
-          <p className="text-slate-400 dark:text-slate-500 text-xs uppercase tracking-wider mb-1">Safe Bunks</p>
-          <p className={`text-xl font-bold ${stats.safeBunks >= 0 ? 'text-green-600 dark:text-green-500' : 'text-red-600 dark:text-red-500'}`}>
-            {stats.safeBunks}
-          </p>
+          {isRecoveryMode ? (
+            <>
+              <p className="text-red-500 dark:text-red-400 text-xs uppercase tracking-wider mb-1 font-bold">Recovery Needed</p>
+              <p className="text-sm font-black text-red-600 dark:text-red-400 leading-tight">
+                Attend next <span className="underline">{stats.classesNeededToRecover}</span> classes
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="text-slate-400 dark:text-slate-500 text-xs uppercase tracking-wider mb-1">Bunk Budget</p>
+              <p className="text-xl font-bold text-green-600 dark:text-green-500">
+                {stats.bunkBudget} {stats.bunkBudget === 1 ? 'class' : 'classes'}
+              </p>
+            </>
+          )}
         </div>
       </div>
     </div>

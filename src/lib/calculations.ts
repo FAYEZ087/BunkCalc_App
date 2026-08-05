@@ -1,35 +1,88 @@
-import type { AttendanceRecord, Subject } from './types';
+import type { AttendanceRecord, Subject, Holiday } from './types';
+import { countRemainingSessions, countCancelledSessions } from './dateUtils';
+
+export interface SubjectStats {
+  attendedCount: number;         // totalAttended (past + recorded)
+  absentCount: number;           // totalMissed (past + recorded)
+  totalClasses: number;          // total logged classes (attendedCount + absentCount)
+  totalSessions: number;         // total semester sessions pool
+  remainingClasses: number;      // sessions remaining from today to end
+  cancelledCount: number;        // cancelled sessions count
+  attendancePct: number;         // current attendance percentage
+  bunkBudget: number;            // safe bunks left (can be negative)
+  safeBunks: number;             // Math.max(0, bunkBudget) for backward compatibility
+  requiredSessions: number;      // required sessions to meet threshold
+  classesNeededToRecover: number;// consecutive classes needed to attend if bunkBudget < 0
+  maxPossiblePct: number;        // % if student attends 100% of remaining classes
+  maxAttended: number;
+  potentialTotal: number;
+}
 
 export const calculateSubjectStats = (
   subject: Subject,
-  records: AttendanceRecord[]
-) => {
+  records: AttendanceRecord[],
+  semesterEndDate?: string,
+  holidays?: Holiday[]
+): SubjectStats => {
   const subjectRecords = records.filter((r) => r.subjectId === subject.id);
-  
-  const attendedCount = subjectRecords.filter((r) => r.status === 'present').length * subject.labMultiplier;
-  const absentCount = subjectRecords.filter((r) => r.status === 'absent').length * subject.labMultiplier;
-  
-  const totalClasses = attendedCount + absentCount;
-  const attendancePct = totalClasses === 0 ? 100 : (attendedCount / totalClasses) * 100;
-  
-  // current safeBunks
-  const safeBunks = Math.floor((attendedCount / subject.threshold) - totalClasses);
 
-  // How many more to attend to reach threshold?
-  let classesToReachThreshold = 0;
-  if (attendancePct < subject.threshold * 100) {
-    // attended + X / total + X = threshold
-    // X = (threshold * total - attended) / (1 - threshold)
-    classesToReachThreshold = Math.ceil((subject.threshold * totalClasses - attendedCount) / (1 - subject.threshold));
+  const attendedSoFar = subject.attendedSoFar || 0;
+  const missedSoFar = subject.missedSoFar || 0;
+  const pastSessions = attendedSoFar + missedSoFar;
+
+  const recordedAttended = subjectRecords.filter((r) => r.status === 'present').length;
+  const recordedMissed = subjectRecords.filter((r) => r.status === 'absent').length;
+  const cancelledCount = countCancelledSessions(records, subject.id);
+
+  const totalAttended = attendedSoFar + recordedAttended;
+  const totalMissed = missedSoFar + recordedMissed;
+  const totalClasses = totalAttended + totalMissed;
+
+  // Remaining sessions count from dateUtils if semesterEndDate provided, else 0
+  const remainingClasses = semesterEndDate
+    ? countRemainingSessions(subject.schedule, semesterEndDate, records, subject.id, holidays || [])
+    : 0;
+
+  // Total sessions in semester pool = pastSessions + recorded + remaining - cancelled
+  const totalSessions = Math.max(
+    totalClasses,
+    pastSessions + recordedAttended + recordedMissed + remainingClasses - cancelledCount
+  );
+
+  const requiredSessions = Math.ceil(totalSessions * subject.threshold);
+  const bunkBudget = totalSessions - requiredSessions - totalMissed;
+
+  // Current attendance %
+  const attendancePct = totalClasses === 0 ? 100 : (totalAttended / totalClasses) * 100;
+
+  // Classes needed to recover if below threshold or negative budget
+  let classesNeededToRecover = 0;
+  if (bunkBudget < 0 || attendancePct < subject.threshold * 100) {
+    const numerator = subject.threshold * totalMissed - totalAttended * (1 - subject.threshold);
+    const denominator = 1 - subject.threshold;
+    classesNeededToRecover = Math.max(0, Math.ceil(numerator / denominator));
   }
 
+  // Max possible % if all remaining sessions are attended
+  const potentialTotal = totalClasses + remainingClasses;
+  const maxAttended = totalAttended + remainingClasses;
+  const maxPossiblePct = potentialTotal === 0 ? 100 : (maxAttended / potentialTotal) * 100;
+
   return {
-    attendedCount,
-    absentCount,
+    attendedCount: totalAttended,
+    absentCount: totalMissed,
     totalClasses,
+    totalSessions,
+    remainingClasses,
+    cancelledCount,
     attendancePct,
-    safeBunks: Math.max(0, safeBunks),
-    classesToReachThreshold: Math.max(0, classesToReachThreshold),
+    bunkBudget,
+    safeBunks: Math.max(0, bunkBudget),
+    requiredSessions,
+    classesNeededToRecover,
+    maxPossiblePct,
+    maxAttended,
+    potentialTotal,
   };
 };
 
@@ -41,44 +94,10 @@ export const parseLocalDate = (dateStr: string): Date => {
 export const calculateProjections = (
   subject: Subject,
   records: AttendanceRecord[],
-  semesterEndDate: string
-) => {
-  const stats = calculateSubjectStats(subject, records);
-  const endDate = new Date(semesterEndDate);
-  const now = new Date();
-  
-  // Calculate remaining classes
-  let remainingClasses = 0;
-  let current = new Date(now);
-  current.setHours(0, 0, 0, 0);
-
-  // If today's attendance for this subject has already been marked, skip today's slot in remaining count
-  const todayStr = now.toLocaleDateString('en-CA'); // YYYY-MM-DD local format
-  const isTodayMarked = records.some(
-    (r) => r.subjectId === subject.id && r.date === todayStr
-  );
-  if (isTodayMarked) {
-    current.setDate(current.getDate() + 1);
-  }
-
-  while (current <= endDate) {
-    const day = current.getDay();
-    const classesToday = subject.schedule.filter(s => Number(s.day) === day).length;
-    remainingClasses += classesToday;
-    current.setDate(current.getDate() + 1);
-  }
-
-  const potentialTotal = stats.totalClasses + (remainingClasses * subject.labMultiplier);
-  const maxAttended = stats.attendedCount + (remainingClasses * subject.labMultiplier);
-  const maxPossiblePct = potentialTotal === 0 ? 100 : (maxAttended / potentialTotal) * 100;
-
-  return {
-    ...stats,
-    remainingClasses,
-    maxPossiblePct,
-    potentialTotal,
-    maxAttended,
-  };
+  semesterEndDate: string,
+  holidays?: Holiday[]
+): SubjectStats => {
+  return calculateSubjectStats(subject, records, semesterEndDate, holidays);
 };
 
 export const getStatusColor = (percentage: number) => {

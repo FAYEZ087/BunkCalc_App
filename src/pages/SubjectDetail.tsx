@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import type { Subject } from '../lib/types';
 import { calculateProjections, getStatusBgColor, parseLocalDate } from '../lib/calculations';
 import { useAttendance } from '../store/useAttendance';
@@ -10,14 +10,14 @@ interface Props {
 }
 
 const SubjectDetail: React.FC<Props> = ({ subject, onBack }) => {
-  const { records, unmarkAttendance } = useAttendance();
+  const { records, unmarkAttendance, markAttendance } = useAttendance();
   const { settings } = useSettings();
   
   const subjectRecords = records
     .filter((r) => r.subjectId === subject.id)
     .sort((a, b) => b.date.localeCompare(a.date));
   
-  const projections = calculateProjections(subject, records, settings.semesterEndDate);
+  const projections = useMemo(() => calculateProjections(subject, records, settings.semesterEndDate, settings.holidays), [subject, records, settings.semesterEndDate, settings.holidays]);
 
   return (
     <div className="min-h-screen bg-white dark:bg-slate-950 text-slate-900 dark:text-white p-6 pb-24">
@@ -38,9 +38,9 @@ const SubjectDetail: React.FC<Props> = ({ subject, onBack }) => {
           </p>
         </div>
         <div className="bg-slate-50 dark:bg-slate-900 rounded-2xl p-4 border border-slate-200 dark:border-slate-800">
-          <p className="text-slate-500 dark:text-slate-400 text-[10px] font-bold uppercase mb-1">Safe Bunks</p>
-          <p className={`text-3xl font-black ${projections.safeBunks > 0 ? 'text-green-500' : 'text-red-500'}`}>
-            {projections.safeBunks}
+          <p className="text-slate-500 dark:text-slate-400 text-[10px] font-bold uppercase mb-1">Bunk Budget</p>
+          <p className={`text-3xl font-black ${projections.bunkBudget >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+            {projections.bunkBudget}
           </p>
         </div>
       </div>
@@ -48,7 +48,7 @@ const SubjectDetail: React.FC<Props> = ({ subject, onBack }) => {
       <section className="mb-8">
         <h2 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-4">Attendance Math</h2>
         <div className="space-y-3">
-          {projections.attendancePct < subject.threshold * 100 && (
+          {(projections.bunkBudget < 0 || projections.attendancePct < subject.threshold * 100) && (
             <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-4 flex items-center gap-4">
               <div className="bg-red-500 h-10 w-10 rounded-full flex items-center justify-center shrink-0">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -56,9 +56,9 @@ const SubjectDetail: React.FC<Props> = ({ subject, onBack }) => {
                 </svg>
               </div>
               <div>
-                <p className="text-sm font-bold text-slate-900 dark:text-white">Shortage Alert</p>
+                <p className="text-sm font-bold text-slate-900 dark:text-white">Recovery Mode</p>
                 <p className="text-xs text-red-600 dark:text-red-400">
-                  Attend the next <span className="font-black underline">{projections.classesToReachThreshold}</span> classes consecutively to reach {subject.threshold * 100}%.
+                  Attend the next <span className="font-black underline">{projections.classesNeededToRecover}</span> classes consecutively to reach {Math.round(subject.threshold * 100)}%.
                 </p>
               </div>
             </div>
@@ -90,12 +90,23 @@ const SubjectDetail: React.FC<Props> = ({ subject, onBack }) => {
               <div key={record.id} className="bg-slate-50 dark:bg-slate-900 rounded-xl p-4 border border-slate-200 dark:border-slate-800 flex justify-between items-center">
                 <div>
                   <p className="text-sm font-bold text-slate-900 dark:text-white">{parseLocalDate(record.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', weekday: 'short' })}</p>
-                  <p className={`text-[10px] font-bold uppercase ${
-                    record.status === 'present' ? 'text-green-500' : 
-                    record.status === 'absent' ? 'text-red-500' : 'text-slate-500'
-                  }`}>
-                    {record.status}
-                  </p>
+                  {record.status !== 'cancelled' ? (
+                    <button 
+                      onClick={() => markAttendance({ ...record, status: record.status === 'present' ? 'absent' : 'present' })}
+                      className={`flex items-center gap-1 text-[10px] font-bold uppercase mt-0.5 px-2 py-1 -ml-2 rounded hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors ${
+                        record.status === 'present' ? 'text-green-500' : 'text-red-500'
+                      }`}
+                    >
+                      {record.status}
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                      </svg>
+                    </button>
+                  ) : (
+                    <p className="text-[10px] font-bold uppercase text-slate-500 mt-0.5">
+                      {record.status}
+                    </p>
+                  )}
                 </div>
                 <button 
                   onClick={() => unmarkAttendance(record.id)}

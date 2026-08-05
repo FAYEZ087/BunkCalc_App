@@ -1,22 +1,26 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, Suspense, lazy } from 'react';
 import { useSettings } from './store/useSettings';
 import { useSubjects } from './store/useSubjects';
 import { useAttendance } from './store/useAttendance';
 import { migrateStorageIfNeeded } from './lib/storage';
 import Home from './pages/Home';
-import Setup from './pages/Setup';
-import Settings from './pages/Settings';
-import Today from './pages/Today';
-import Statistics from './pages/Statistics';
-import SubjectDetail from './pages/SubjectDetail';
-import GlobalHistory from './pages/GlobalHistory';
 import BottomNav from './components/BottomNav';
-import OnboardingCarousel from './components/OnboardingCarousel';
 import SplashScreen from './components/SplashScreen';
+import SkeletonLoader from './components/SkeletonLoader';
+import ErrorBoundary from './components/ErrorBoundary';
 import type { TabType } from './components/BottomNav';
 import type { Subject } from './lib/types';
-
 import { scheduleDailyClassReminders } from './lib/notifications';
+
+// Lazy loaded views
+const Setup = lazy(() => import('./pages/Setup'));
+const Settings = lazy(() => import('./pages/Settings'));
+const Today = lazy(() => import('./pages/Today'));
+const Statistics = lazy(() => import('./pages/Statistics'));
+const SubjectDetail = lazy(() => import('./pages/SubjectDetail'));
+const GlobalHistory = lazy(() => import('./pages/GlobalHistory'));
+const OnboardingCarousel = lazy(() => import('./components/OnboardingCarousel'));
+const CalendarView = lazy(() => import('./pages/CalendarView'));
 
 function App() {
   const { loadSettings, loadArchivedSemesters } = useSettings();
@@ -32,6 +36,7 @@ function App() {
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
   const [showHistory, setShowHistory] = useState(false);
+  const [showCalendar, setShowCalendar] = useState(false);
 
   // ── Back button handler ──
   useEffect(() => {
@@ -46,6 +51,8 @@ function App() {
             setSelectedSubject(null);
           } else if (showHistory) {
             setShowHistory(false);
+          } else if (showCalendar) {
+            setShowCalendar(false);
           } else if (activeTab !== 'dashboard') {
             setActiveTab('dashboard');
           } else {
@@ -64,7 +71,7 @@ function App() {
         backButtonListener.remove();
       }
     };
-  }, [selectedSubject, showHistory, activeTab, showSplash]);
+  }, [selectedSubject, showHistory, showCalendar, activeTab, showSplash]);
 
   // ── Load data in parallel with splash animation ──
   useEffect(() => {
@@ -80,8 +87,9 @@ function App() {
       // Schedule reminders after loading
       const currentSubjects = useSubjects.getState().subjects;
       const currentSettings = useSettings.getState().settings;
+      const currentRecords = useAttendance.getState().records;
       if (currentSubjects.length > 0) {
-        await scheduleDailyClassReminders(currentSubjects, currentSettings);
+        await scheduleDailyClassReminders(currentSubjects, currentSettings, currentRecords);
       }
 
       if (currentSubjects.length === 0) {
@@ -94,20 +102,14 @@ function App() {
   }, [loadSettings, loadSubjects, loadRecords, loadArchivedSemesters]);
 
   // ── Splash complete callback ──
-  // When splash video finishes → detect theme → fade in home
   const handleSplashComplete = useCallback(() => {
-    // Theme is already applied by loadSettings() → applyTheme().
-    // Hide the splash layer
     setShowSplash(false);
-    // Trigger the home fade-in after a micro-tick so the browser registers opacity: 0 first
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         setHomeVisible(true);
       });
     });
   }, []);
-
-  // ── Render: splash is always on top while active ──
 
   // If data hasn't loaded yet AND splash finished, show a minimal loader
   if (!dataReady && !showSplash) {
@@ -120,32 +122,36 @@ function App() {
 
   return (
     <>
-      {/* Splash overlay – sits above everything */}
-      {showSplash && <SplashScreen onComplete={handleSplashComplete} />}
+      <ErrorBoundary>
+        {/* Splash overlay – sits above everything */}
+        {showSplash && <SplashScreen onComplete={handleSplashComplete} />}
 
-      {/* Main app content – starts hidden, fades in over 300ms */}
-      {dataReady && (
-        <div
-          style={{
-            opacity: homeVisible ? 1 : 0,
-            transition: 'opacity 300ms ease-in',
-          }}
-          className="min-h-screen bg-white dark:bg-slate-950 transition-colors duration-300"
-        >
-          {showOnboarding && subjects.length === 0 ? (
-            <OnboardingCarousel onComplete={() => setShowOnboarding(false)} />
-          ) : subjects.length === 0 ? (
-            <Setup />
-          ) : (
-            <>
-              {renderMainContent()}
-              {!selectedSubject && !showHistory && (
-                <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
+        {/* Main app content – starts hidden, fades in over 300ms */}
+        {dataReady && (
+          <div
+            style={{
+              opacity: homeVisible ? 1 : 0,
+              transition: 'opacity 300ms ease-in',
+            }}
+            className="min-h-screen bg-white dark:bg-slate-950 transition-colors duration-300"
+          >
+            <Suspense fallback={<div className="p-6"><SkeletonLoader height="h-64" /></div>}>
+              {showOnboarding && subjects.length === 0 ? (
+                <OnboardingCarousel onComplete={() => setShowOnboarding(false)} />
+              ) : subjects.length === 0 ? (
+                <Setup />
+              ) : (
+                <>
+                  {renderMainContent()}
+                  {!selectedSubject && !showHistory && !showCalendar && (
+                    <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
+                  )}
+                </>
               )}
-            </>
-          )}
-        </div>
-      )}
+            </Suspense>
+          </div>
+        )}
+      </ErrorBoundary>
     </>
   );
 
@@ -163,9 +169,13 @@ function App() {
       return <GlobalHistory onBack={() => setShowHistory(false)} />;
     }
 
+    if (showCalendar) {
+      return <CalendarView onBack={() => setShowCalendar(false)} />;
+    }
+
     switch (activeTab) {
       case 'dashboard':
-        return <Home onSelectSubject={(s) => setSelectedSubject(s)} />;
+        return <Home onSelectSubject={(s) => setSelectedSubject(s)} onOpenCalendar={() => setShowCalendar(true)} />;
       case 'today':
         return <Today />;
       case 'stats':
@@ -173,7 +183,7 @@ function App() {
       case 'settings':
         return <Settings />;
       default:
-        return <Home onSelectSubject={(s) => setSelectedSubject(s)} />;
+        return <Home onSelectSubject={(s) => setSelectedSubject(s)} onOpenCalendar={() => setShowCalendar(true)} />;
     }
   }
 }

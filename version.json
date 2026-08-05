@@ -1,6 +1,6 @@
 {
-  "versionCode": 2,
-  "versionName": "1.1.0",
-  "apkUrl": "https://github.com/FAYEZ087/BunkCalc_App/releases/download/v1.1.0/BunkCalc.apk",
-  "changelog": "Added launching animation and logo"
+  "versionCode": 4,
+  "versionName": "1.1.2",
+  "apkUrl": "https://github.com/FAYEZ087/BunkCalc_App/releases/download/v1.1.2/BunkCalc.apk",
+  "changelog": "Updated lab session calculation logic, removed bulk quick mark actions, and UI refinements"
 }

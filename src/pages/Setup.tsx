@@ -16,10 +16,14 @@ const Setup: React.FC = () => {
   // Current subject being added
   const [name, setName] = useState('');
   const [credits, setCredits] = useState(3);
-  const [labMultiplier, setLabMultiplier] = useState<1 | 2>(1);
+  const [isLab, setIsLab] = useState(false);
   const [useCustomTime, setUseCustomTime] = useState(false);
   const [globalSlot, setGlobalTime] = useState('09:00');
   const [scheduleMap, setScheduleMap] = useState<Record<number, string>>({});
+  const [attendedSoFar, setAttendedSoFar] = useState<number>(0);
+  const [missedSoFar, setMissedSoFar] = useState<number>(0);
+
+  const [subjectThreshold, setSubjectThreshold] = useState<number>(settings.globalThreshold);
 
   // Modal Dialog state
   const [modal, setModal] = useState<{
@@ -58,12 +62,14 @@ const Setup: React.FC = () => {
       id: uuidv4(),
       name: sanitizedName,
       credits,
-      threshold: settings.globalThreshold,
-      labMultiplier,
+      threshold: subjectThreshold,
+      isLab,
       schedule: days.map(day => ({ 
         day, 
         slot: useCustomTime ? scheduleMap[day] : globalSlot 
       })),
+      attendedSoFar: Math.max(0, attendedSoFar),
+      missedSoFar: Math.max(0, missedSoFar),
     };
     
     setTempSubjects([...tempSubjects, newSub]);
@@ -71,10 +77,12 @@ const Setup: React.FC = () => {
     // Reset form
     setName('');
     setCredits(3);
-    setLabMultiplier(1);
+    setIsLab(false);
     setUseCustomTime(false);
     setGlobalTime('09:00');
     setScheduleMap({});
+    setAttendedSoFar(0);
+    setMissedSoFar(0);
   };
 
   const toggleDay = (idx: number) => {
@@ -200,12 +208,27 @@ const Setup: React.FC = () => {
                 <div className="flex-1">
                   <label className="block text-slate-500 text-[10px] font-bold uppercase tracking-widest mb-2">Type</label>
                   <select 
-                    value={labMultiplier}
-                    onChange={(e) => setLabMultiplier(Number(e.target.value) as 1 | 2)}
-                    className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-3 rounded-xl text-sm outline-none focus:border-blue-500 text-slate-900 dark:text-white"
+                    value={isLab ? 'lab' : 'theory'}
+                    onChange={(e) => setIsLab(e.target.value === 'lab')}
+                    className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-3 rounded-xl text-sm outline-none focus:border-blue-500 text-slate-900 dark:text-white font-bold"
                   >
-                    <option value={1}>Theory</option>
-                    <option value={2}>Lab (x2)</option>
+                    <option value="theory">Theory</option>
+                    <option value="lab">Lab</option>
+                  </select>
+                  <p className="text-[10px] text-slate-500 mt-1 italic">
+                    Mark as lab to display as a 2-hour slot. Does not affect attendance count.
+                  </p>
+                </div>
+                <div className="flex-1">
+                  <label className="block text-slate-500 text-[10px] font-bold uppercase tracking-widest mb-2">Target %</label>
+                  <select 
+                    value={Math.round(subjectThreshold * 100)}
+                    onChange={(e) => setSubjectThreshold(Number(e.target.value) / 100)}
+                    className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-3 rounded-xl text-sm outline-none focus:border-blue-500 text-slate-900 dark:text-white font-bold"
+                  >
+                    {[60, 65, 70, 75, 80, 85, 90].map(val => (
+                      <option key={val} value={val}>{val}%</option>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -271,6 +294,33 @@ const Setup: React.FC = () => {
                     ))}
                   </div>
                 )}
+              </div>
+
+              <div className="bg-white dark:bg-slate-800/50 p-4 rounded-xl border border-slate-100 dark:border-slate-800 space-y-3">
+                <p className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">Mid-Semester History (Optional)</p>
+                <p className="text-[10px] text-slate-500 italic">Fill this in if you already have past attendance history this semester.</p>
+                <div className="flex gap-4">
+                  <div className="flex-1">
+                    <label className="block text-slate-500 text-[10px] font-bold uppercase tracking-widest mb-1">Attended So Far</label>
+                    <input 
+                      type="number" 
+                      min={0}
+                      value={attendedSoFar}
+                      onChange={(e) => setAttendedSoFar(Math.max(0, parseInt(e.target.value) || 0))}
+                      className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-2.5 rounded-xl text-sm outline-none focus:border-blue-500 font-bold text-slate-900 dark:text-white"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <label className="block text-slate-500 text-[10px] font-bold uppercase tracking-widest mb-1">Missed So Far</label>
+                    <input 
+                      type="number" 
+                      min={0}
+                      value={missedSoFar}
+                      onChange={(e) => setMissedSoFar(Math.max(0, parseInt(e.target.value) || 0))}
+                      className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-2.5 rounded-xl text-sm outline-none focus:border-blue-500 font-bold text-slate-900 dark:text-white"
+                    />
+                  </div>
+                </div>
               </div>
 
               <button 

@@ -11,7 +11,9 @@ export interface Subject {
   credits: number;
   threshold: number;
   schedule: ScheduleSlot[];
-  labMultiplier: 1 | 2;
+  isLab?: boolean;
+  attendedSoFar?: number; // past sessions attended before app install (default 0)
+  missedSoFar?: number;   // past sessions missed before app install (default 0)
 }
 
 export interface AttendanceRecord {
@@ -31,14 +33,29 @@ export interface ArchivedSemester {
   overallPct: number;
 }
 
+export interface Holiday {
+  id: string;
+  name: string;
+  startDate: string; // YYYY-MM-DD
+  endDate: string;   // YYYY-MM-DD
+}
+
+export type ThemeMode = 'light' | 'dark' | 'oled' | 'system';
+export type ThemeAccent = 'blue' | 'purple' | 'emerald' | 'amber' | 'rose';
+
 export interface AppSettings {
   semesterEndDate: string;
   globalThreshold: number;
   warningBuffer: number;
   notificationsEnabled: boolean;
+  preClassReminder?: boolean;
+  postClassReminder?: boolean;
+  sundaySummaryNotification?: boolean;
   reminderMinutesBefore: 5 | 10 | 15 | 30;
   holidayMode: boolean;
   hapticsEnabled: boolean;
-  theme: 'light' | 'dark' | 'system';
+  theme: ThemeMode;
+  themeAccent?: ThemeAccent;
+  holidays?: Holiday[];
 }
 

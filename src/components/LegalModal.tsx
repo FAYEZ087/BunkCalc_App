@@ -21,7 +21,7 @@ const LegalModal: React.FC<Props> = ({ title, type, onClose }) => {
       <div className="flex-1 overflow-y-auto p-6 text-slate-600 dark:text-slate-300 text-sm leading-relaxed space-y-6">
         {type === 'privacy' ? (
           <>
-            <p className="text-slate-500 dark:text-slate-400 text-xs italic">Effective Date: May 1, 2026 &bull; Version 1.1</p>
+            <p className="text-slate-500 dark:text-slate-400 text-xs italic">Effective Date: August 5, 2026 &bull; Version 1.1.2</p>
             
             <section>
               <h3 className="text-slate-900 dark:text-white font-bold text-lg mb-2">1. Introduction</h3>
@@ -104,7 +104,7 @@ const LegalModal: React.FC<Props> = ({ title, type, onClose }) => {
           </>
         ) : (
           <>
-            <p className="text-slate-500 dark:text-slate-400 text-xs italic">Effective Date: May 1, 2026 &bull; Version 1.1</p>
+            <p className="text-slate-500 dark:text-slate-400 text-xs italic">Effective Date: August 5, 2026 &bull; Version 1.1.2</p>
             
             <section>
               <h3 className="text-slate-900 dark:text-white font-bold text-lg mb-2">1. Acceptance of Terms</h3>
@@ -116,9 +116,10 @@ const LegalModal: React.FC<Props> = ({ title, type, onClose }) => {
               <p>BunkCalc is a personal attendance management tool designed for university and college students in India. The App allows users to:</p>
               <ul className="list-disc ml-5 mt-2 space-y-1">
                 <li>Track daily class attendance across multiple subjects</li>
-                <li>Calculate safe bunk budgets based on institutional attendance thresholds</li>
+                <li>Calculate safe bunk budgets based on semester-forward calculations and target thresholds</li>
+                <li>Mark lab sessions (displayed as 2-hour timetable blocks without inflating attendance counts) and cancelled classes</li>
                 <li>Receive local push notifications for upcoming classes and attendance alerts</li>
-                <li>View semester-end projections and attendance statistics</li>
+                <li>View semester-end projections, recovery mode guidance, and attendance statistics</li>
                 <li>Export, backup, and share attendance summaries</li>
               </ul>
               <p className="mt-2">The App operates entirely offline with local-only data storage. No account creation, registration, or internet connection is required for core functionality.</p>
@@ -204,7 +205,7 @@ const LegalModal: React.FC<Props> = ({ title, type, onClose }) => {
           </>
         )}
         <div className="pt-10 pb-10 text-center text-slate-400 dark:text-slate-500 text-[10px]">
-          Last Updated: May 1, 2026 &bull; BunkCalc v1.1.0
+          Last Updated: August 5, 2026 &bull; BunkCalc v1.1.2
         </div>
       </div>
     </div>

@@ -1,19 +1,31 @@
-import React, { useState } from 'react';
+import React, { useState, Suspense, lazy } from 'react';
 import { useSubjects } from '../store/useSubjects';
 import { useAttendance } from '../store/useAttendance';
+import { useSettings } from '../store/useSettings';
 import SubjectCard from '../components/SubjectCard';
 import AlertBanner from '../components/AlertBanner';
-import SubjectModal from '../components/SubjectModal';
-import TimetableGrid from '../components/TimetableGrid';
+import BunkMeter from '../components/BunkMeter';
+import ThemedIcon from '../components/ThemedIcon';
+import HelpTooltip from '../components/HelpTooltip';
+import SkeletonLoader from '../components/SkeletonLoader';
+import { calculateSubjectStats } from '../lib/calculations';
 import type { Subject } from '../lib/types';
+
+// Lazy loaded heavy components
+const TimetableGrid = lazy(() => import('../components/TimetableGrid'));
+const SubjectModal = lazy(() => import('../components/SubjectModal'));
 
 interface Props {
   onSelectSubject: (subject: Subject) => void;
+  onOpenCalendar: () => void;
 }
 
-const Home: React.FC<Props> = ({ onSelectSubject }) => {
+const Home: React.FC<Props> = ({ onSelectSubject, onOpenCalendar }) => {
   const { subjects, addSubject, updateSubject, deleteSubject } = useSubjects();
+  const records = useAttendance((state) => state.records);
   const streak = useAttendance((state) => state.getStreak());
+  const settings = useSettings((state) => state.settings);
+
   const [modalMode, setModalMode] = useState<'none' | 'add' | 'edit'>('none');
   const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
   const [viewMode, setViewMode] = useState<'dashboard' | 'timetable'>('dashboard');
@@ -25,27 +37,81 @@ const Home: React.FC<Props> = ({ onSelectSubject }) => {
     return () => clearInterval(timer);
   }, []);
 
-  const getNextClass = () => {
-    if (subjects.length === 0) return null;
-    
+  // Compute Overall Bunk Budget & Overall Attendance
+  const overallStats = React.useMemo(() => {
+    if (subjects.length === 0) {
+      return { totalAttended: 0, totalClasses: 0, percentage: 100, safeBunksTotal: 0, classesNeededTotal: 0 };
+    }
+
+    let totalAttended = 0;
+    let totalClasses = 0;
+    let safeBunksTotal = 0;
+    let classesNeededTotal = 0;
+
+    subjects.forEach((subj) => {
+      const stats = calculateSubjectStats(
+        subj,
+        records,
+        settings.semesterEndDate,
+        settings.holidays
+      );
+      totalAttended += stats.attendedCount;
+      totalClasses += stats.totalClasses;
+      safeBunksTotal += stats.bunkBudget;
+      if (stats.bunkBudget < 0) {
+        classesNeededTotal += stats.classesNeededToRecover;
+      }
+    });
+
+    const percentage = totalClasses === 0 ? 100 : (totalAttended / totalClasses) * 100;
+
+    return {
+      totalAttended,
+      totalClasses,
+      percentage,
+      safeBunksTotal,
+      classesNeededTotal,
+    };
+  }, [subjects, records, settings.semesterEndDate, settings.holidays]);
+
+  const getLiveAndNextClass = (): {
+    liveClass: { subject: Subject; time: string; endMins: number } | null;
+    nextClass: { subject: Subject; time: string; startMins: number } | null;
+  } => {
+    if (subjects.length === 0) return { liveClass: null, nextClass: null };
+
     const today = now.getDay();
-    const currentTimeStr = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
-    
-    let upcoming: { subject: Subject; time: string }[] = [];
-    
-    subjects.forEach(s => {
-      s.schedule.forEach(slot => {
-        if (Number(slot.day) === today && slot.slot > currentTimeStr) {
-          upcoming.push({ subject: s, time: slot.slot });
+    const currentMins = now.getHours() * 60 + now.getMinutes();
+
+    let live: { subject: Subject; time: string; endMins: number } | null = null;
+    let upcoming: { subject: Subject; time: string; startMins: number }[] = [];
+
+    subjects.forEach((s) => {
+      s.schedule.forEach((slot) => {
+        if (Number(slot.day) === today) {
+          const [h, m] = slot.slot.split(':').map(Number);
+          const startMins = h * 60 + m;
+          const duration = s.isLab ? 120 : 60;
+          const endMins = startMins + duration;
+
+          if (currentMins >= startMins && currentMins < endMins) {
+            live = { subject: s, time: slot.slot, endMins };
+          } else if (startMins > currentMins) {
+            upcoming.push({ subject: s, time: slot.slot, startMins });
+          }
         }
       });
     });
 
-    upcoming.sort((a, b) => a.time.localeCompare(b.time));
-    return upcoming[0] || null;
+    upcoming.sort((a, b) => a.startMins - b.startMins);
+
+    return {
+      liveClass: live,
+      nextClass: upcoming[0] || null,
+    };
   };
 
-  const nextClass = getNextClass();
+  const { liveClass, nextClass } = getLiveAndNextClass();
 
   const handleSaveSubject = (subject: Subject) => {
     if (modalMode === 'add') {
@@ -73,7 +139,13 @@ const Home: React.FC<Props> = ({ onSelectSubject }) => {
       <header className="mb-6 flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-blue-500 italic uppercase">BunkCalc</h1>
-          <p className="text-slate-500 dark:text-slate-400 text-xs font-bold tracking-widest">DASHBOARD</p>
+          <p className="text-slate-500 dark:text-slate-400 text-xs font-bold tracking-widest flex items-center gap-1">
+            DASHBOARD
+            <HelpTooltip
+              title="Dashboard Overview"
+              content="Track your overall attendance health, live class schedule, and safe bunk pool calculated for the semester."
+            />
+          </p>
         </div>
         <div className="flex gap-2 items-center">
           {streak >= 2 && (
@@ -82,13 +154,19 @@ const Home: React.FC<Props> = ({ onSelectSubject }) => {
               <span className="text-orange-500 text-xs font-black">{streak}</span>
             </div>
           )}
-          <button 
-            onClick={() => setModalMode('add')}
-            className="bg-slate-50 dark:bg-slate-900 p-2 rounded-lg border border-slate-200 dark:border-slate-800 shadow-lg active:scale-90 transition-transform"
+          <button
+            onClick={onOpenCalendar}
+            className="bg-slate-50 dark:bg-slate-900 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-lg active:scale-90 transition-transform"
+            aria-label="Open Calendar"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4" />
-            </svg>
+            <ThemedIcon name="calendar" size={22} className="text-blue-500" />
+          </button>
+          <button
+            onClick={() => setModalMode('add')}
+            className="bg-slate-50 dark:bg-slate-900 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-lg active:scale-90 transition-transform"
+            aria-label="Add Subject"
+          >
+            <ThemedIcon name="plus" size={22} className="text-emerald-500" />
           </button>
         </div>
       </header>
@@ -121,8 +199,60 @@ const Home: React.FC<Props> = ({ onSelectSubject }) => {
 
       {viewMode === 'dashboard' ? (
         <>
+          {/* Animated Bunk Meter Component */}
+          {subjects.length > 0 && (
+            <div className="mb-6">
+              <BunkMeter
+                percentage={overallStats.percentage}
+                safeBunksTotal={overallStats.safeBunksTotal}
+                classesNeededTotal={overallStats.classesNeededTotal}
+                totalClasses={overallStats.totalClasses}
+                totalAttended={overallStats.totalAttended}
+                label="Overall Attendance"
+              />
+            </div>
+          )}
+
+          {/* Live Class Banner */}
+          {liveClass && (
+            <div className="bg-gradient-to-r from-emerald-600 to-teal-700 rounded-3xl p-6 mb-6 shadow-xl shadow-emerald-500/20 relative overflow-hidden text-white border border-emerald-400/30 animate-in fade-in slide-in-from-top duration-300">
+              <div className="flex justify-between items-start mb-2">
+                <div className="flex items-center gap-2">
+                  <span className="relative flex h-3 w-3">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-200 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-white"></span>
+                  </span>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-emerald-100">CLASS IS LIVE NOW</span>
+                </div>
+                <span className="bg-white/20 text-white px-2.5 py-0.5 rounded-full text-[10px] font-bold">
+                  Started at {liveClass.time}
+                </span>
+              </div>
+
+              <h3 className="text-2xl font-black mb-2 truncate pr-4">{liveClass.subject.name}</h3>
+
+              <div className="flex items-center justify-between">
+                <span className="text-emerald-100 text-xs font-bold flex items-center gap-1.5">
+                  <ThemedIcon name="history" size={16} className="text-emerald-200" />
+                  Ends in {
+                    (() => {
+                      const currentMins = now.getHours() * 60 + now.getMinutes();
+                      const remaining = liveClass.endMins - currentMins;
+                      return remaining > 60 ? `${Math.floor(remaining / 60)}h ${remaining % 60}m` : `${remaining} mins`;
+                    })()
+                  }
+                </span>
+                <span className="text-[10px] text-emerald-200/80 italic font-medium flex items-center gap-1">
+                  {liveClass.subject.isLab && <ThemedIcon name="lab" size={14} />}
+                  {liveClass.subject.isLab ? 'Lab Session (2 hrs)' : 'Lecture Session (1 hr)'}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Upcoming Next Banner */}
           {nextClass && (
-            <div className="bg-blue-600 rounded-3xl p-6 mb-8 shadow-xl shadow-blue-500/20 relative overflow-hidden">
+            <div className="bg-blue-600 rounded-3xl p-6 mb-8 shadow-xl shadow-blue-500/20 relative overflow-hidden text-white">
               <div className="absolute -right-4 -top-4 w-24 h-24 bg-white/10 rounded-full blur-2xl"></div>
               <p className="text-blue-100 text-[10px] font-black uppercase tracking-widest mb-1">Upcoming Next</p>
               <h3 className="text-2xl font-black mb-1 truncate pr-12">{nextClass.subject.name}</h3>
@@ -137,20 +267,26 @@ const Home: React.FC<Props> = ({ onSelectSubject }) => {
                 }</span>
               </div>
               <div className="absolute right-6 top-1/2 -translate-y-1/2 opacity-20">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+                <ThemedIcon name="calendar" size={64} />
               </div>
             </div>
           )}
 
           <section>
-            <h2 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">Your Subjects</h2>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
+                Your Subjects
+                <HelpTooltip
+                  title="Subject Cards"
+                  content="Tap any subject to view detailed logs or adjust attendance history."
+                />
+              </h2>
+            </div>
             <div className="grid gap-4">
               {subjects.map((subject) => (
-                <SubjectCard 
-                  key={subject.id} 
-                  subject={subject} 
+                <SubjectCard
+                  key={subject.id}
+                  subject={subject}
                   onClick={() => onSelectSubject(subject)}
                   onEdit={() => handleEditClick(subject)}
                   onDelete={() => handleDeleteSubject(subject.id, subject.name)}
@@ -160,18 +296,22 @@ const Home: React.FC<Props> = ({ onSelectSubject }) => {
           </section>
         </>
       ) : (
-        <TimetableGrid />
+        <Suspense fallback={<SkeletonLoader height="h-64" />}>
+          <TimetableGrid />
+        </Suspense>
       )}
 
       {modalMode !== 'none' && (
-        <SubjectModal 
-          subject={editingSubject || undefined}
-          onSave={handleSaveSubject}
-          onCancel={() => {
-            setModalMode('none');
-            setEditingSubject(null);
-          }}
-        />
+        <Suspense fallback={<SkeletonLoader height="h-48" />}>
+          <SubjectModal
+            subject={editingSubject || undefined}
+            onSave={handleSaveSubject}
+            onCancel={() => {
+              setModalMode('none');
+              setEditingSubject(null);
+            }}
+          />
+        </Suspense>
       )}
     </div>
   );

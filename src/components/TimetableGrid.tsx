@@ -151,9 +151,9 @@ const TimetableGrid: React.FC = () => {
                         <p className="text-[10px] text-white/70 mt-1 leading-tight">
                           {block.slot}
                         </p>
-                        {block.subject.labMultiplier === 2 && (
+                        {block.subject.isLab && (
                           <span className="inline-block mt-1.5 text-[9px] font-bold uppercase tracking-wider bg-white/20 backdrop-blur-sm rounded-md px-1.5 py-0.5">
-                            Lab
+                            Lab (2 hrs)
                           </span>
                         )}
                       </div>

@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useSubjects } from '../store/useSubjects';
 import { useAttendance } from '../store/useAttendance';
 import { useSettings } from '../store/useSettings';
-import { calculateSubjectStats, getStatusBgColor, calculateProjections } from '../lib/calculations';
+import { calculateSubjectStats, getStatusBgColor } from '../lib/calculations';
 import ShareCard from '../components/ShareCard';
 import EmptyState from '../components/EmptyState';
 import { shareAttendanceCard } from '../lib/shareCard';
@@ -20,21 +20,30 @@ const Statistics: React.FC<Props> = ({ onOpenHistory }) => {
   const [isSharing, setIsSharing] = useState(false);
   const [modal, setModal] = useState<{ isOpen: boolean; title: string; message: string; type?: 'error' } | null>(null);
 
-  const totalAttended = subjects.reduce((acc, s) => acc + calculateSubjectStats(s, records).attendedCount, 0);
-  const totalPossible = subjects.reduce((acc, s) => acc + calculateSubjectStats(s, records).totalClasses, 0);
-  const overallPct = totalPossible === 0 ? 100 : (totalAttended / totalPossible) * 100;
-
-  // Calculate dynamic overall perfect attendance projection
-  const overallPeakPct = (() => {
+  const { totalAttended, totalPossible, overallPct, overallPeakPct } = useMemo(() => {
+    let tAttended = 0;
+    let tPossible = 0;
     let totalMaxAttended = 0;
     let totalPotentialTotal = 0;
+
     subjects.forEach((s) => {
-      const proj = calculateProjections(s, records, settings.semesterEndDate);
-      totalMaxAttended += proj.maxAttended;
-      totalPotentialTotal += proj.potentialTotal;
+      const stats = calculateSubjectStats(s, records, settings.semesterEndDate, settings.holidays);
+      tAttended += stats.attendedCount;
+      tPossible += stats.totalClasses;
+      totalMaxAttended += stats.maxAttended;
+      totalPotentialTotal += stats.potentialTotal;
     });
-    return totalPotentialTotal === 0 ? 100 : (totalMaxAttended / totalPotentialTotal) * 100;
-  })();
+
+    const oPct = tPossible === 0 ? 100 : (tAttended / tPossible) * 100;
+    const oPeakPct = totalPotentialTotal === 0 ? 100 : (totalMaxAttended / totalPotentialTotal) * 100;
+
+    return {
+      totalAttended: tAttended,
+      totalPossible: tPossible,
+      overallPct: oPct,
+      overallPeakPct: oPeakPct
+    };
+  }, [subjects, records, settings.semesterEndDate, settings.holidays]);
 
   const handleShare = async () => {
     setIsSharing(true);
@@ -120,14 +129,14 @@ const Statistics: React.FC<Props> = ({ onOpenHistory }) => {
           <div>
             <div className="flex justify-between items-center mb-2">
               <p className="text-sm font-bold">Safe Bunk Budget</p>
-              <span className="text-green-500 font-bold">Calculated</span>
+              <span className="text-green-500 font-bold">Semester-Forward</span>
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
               Based on your {subjects.length} subjects, you can skip a total of 
               <span className="text-slate-900 dark:text-white font-bold px-1">
-                {subjects.reduce((acc, s) => acc + Math.max(0, calculateSubjectStats(s, records).safeBunks), 0)}
+                {subjects.reduce((acc, s) => acc + Math.max(0, calculateSubjectStats(s, records, settings.semesterEndDate, settings.holidays).bunkBudget), 0)}
               </span> 
-              classes right now while staying above {settings.globalThreshold * 100}%.
+              classes right now while staying above {Math.round(settings.globalThreshold * 100)}%.
             </p>
           </div>
           
@@ -145,10 +154,13 @@ const Statistics: React.FC<Props> = ({ onOpenHistory }) => {
         <h2 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-4">Subject breakdown</h2>
         <div className="space-y-3">
           {subjects.map((s) => {
-            const stats = calculateSubjectStats(s, records);
+            const stats = calculateSubjectStats(s, records, settings.semesterEndDate, settings.holidays);
             return (
               <div key={s.id} className="bg-slate-50 dark:bg-slate-900 rounded-xl p-4 border border-slate-200 dark:border-slate-800 flex justify-between items-center">
-                <span className="font-bold text-sm text-slate-900 dark:text-white">{s.name}</span>
+                <div>
+                  <span className="font-bold text-sm text-slate-900 dark:text-white block">{s.name}</span>
+                  <span className="text-[10px] text-slate-400">Budget: {stats.bunkBudget} bunks</span>
+                </div>
                 <div className={`text-xs font-black px-3 py-1 rounded-lg text-white ${getStatusBgColor(stats.attendancePct)}`}>
                   {stats.attendancePct.toFixed(0)}%
                 </div>

@@ -16,7 +16,7 @@ const SubjectModal: React.FC<Props> = ({ subject, onSave, onCancel }) => {
   const { settings } = useSettings();
   const [name, setName] = useState(subject?.name || '');
   const [credits, setCredits] = useState(subject?.credits || 3);
-  const [labMultiplier, setLabMultiplier] = useState<1 | 2>(subject?.labMultiplier || 1);
+  const [isLab, setIsLab] = useState<boolean>(subject?.isLab || (subject as any)?.labMultiplier === 2 || false);
   
   // New state: Use custom time per day
   const [useCustomTime, setUseCustomTime] = useState(
@@ -28,6 +28,10 @@ const SubjectModal: React.FC<Props> = ({ subject, onSave, onCancel }) => {
   const [scheduleMap, setScheduleMap] = useState<Record<number, string>>(
     subject?.schedule.reduce((acc, curr) => ({ ...acc, [curr.day]: curr.slot }), {}) || {}
   );
+
+  const [attendedSoFar, setAttendedSoFar] = useState<number>(subject?.attendedSoFar || 0);
+  const [missedSoFar, setMissedSoFar] = useState<number>(subject?.missedSoFar || 0);
+  const [threshold, setThreshold] = useState<number>(subject?.threshold || settings.globalThreshold);
 
   // Modal Dialog state for validation/errors
   const [modal, setModal] = useState<{
@@ -79,12 +83,14 @@ const SubjectModal: React.FC<Props> = ({ subject, onSave, onCancel }) => {
       id: subject?.id || uuidv4(),
       name: sanitizedName,
       credits,
-      threshold: settings.globalThreshold,
-      labMultiplier,
+      threshold,
+      isLab,
       schedule: days.map(day => ({ 
         day, 
         slot: useCustomTime ? scheduleMap[day] : globalSlot 
       })),
+      attendedSoFar: Math.max(0, attendedSoFar),
+      missedSoFar: Math.max(0, missedSoFar),
     };
     
     onSave(newSub);
@@ -143,12 +149,27 @@ const SubjectModal: React.FC<Props> = ({ subject, onSave, onCancel }) => {
             <div className="flex-1">
               <label className="block text-slate-500 dark:text-slate-500 text-[10px] font-bold uppercase tracking-widest mb-2">Type</label>
               <select 
-                value={labMultiplier}
-                onChange={(e) => setLabMultiplier(Number(e.target.value) as 1 | 2)}
+                value={isLab ? 'lab' : 'theory'}
+                onChange={(e) => setIsLab(e.target.value === 'lab')}
                 className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-3 rounded-xl text-sm outline-none focus:border-blue-500 text-slate-900 dark:text-white"
               >
-                <option value={1}>Theory</option>
-                <option value={2}>Lab (x2)</option>
+                <option value="theory">Theory</option>
+                <option value="lab">Lab</option>
+              </select>
+              <p className="text-[10px] text-slate-500 mt-1 italic">
+                Mark as lab to display as a 2-hour slot. Does not affect attendance count.
+              </p>
+            </div>
+            <div className="flex-1">
+              <label className="block text-slate-500 dark:text-slate-500 text-[10px] font-bold uppercase tracking-widest mb-2">Target %</label>
+              <select 
+                value={Math.round(threshold * 100)}
+                onChange={(e) => setThreshold(Number(e.target.value) / 100)}
+                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-3 rounded-xl text-sm outline-none focus:border-blue-500 text-slate-900 dark:text-white font-bold"
+              >
+                {[60, 65, 70, 75, 80, 85, 90].map(val => (
+                  <option key={val} value={val}>{val}%</option>
+                ))}
               </select>
             </div>
           </div>
@@ -214,6 +235,33 @@ const SubjectModal: React.FC<Props> = ({ subject, onSave, onCancel }) => {
                   </div>
                 );
               })}
+            </div>
+          </div>
+
+          <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl border border-slate-100 dark:border-slate-800 space-y-3">
+            <p className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">Mid-Semester History (Optional)</p>
+            <p className="text-[10px] text-slate-500 italic">Classes attended/missed prior to app usage.</p>
+            <div className="flex gap-4">
+              <div className="flex-1">
+                <label className="block text-slate-500 text-[10px] font-bold uppercase tracking-widest mb-1">Attended So Far</label>
+                <input 
+                  type="number" 
+                  min={0}
+                  value={attendedSoFar}
+                  onChange={(e) => setAttendedSoFar(Math.max(0, parseInt(e.target.value) || 0))}
+                  className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-2.5 rounded-xl text-sm outline-none focus:border-blue-500 font-bold text-slate-900 dark:text-white"
+                />
+              </div>
+              <div className="flex-1">
+                <label className="block text-slate-500 text-[10px] font-bold uppercase tracking-widest mb-1">Missed So Far</label>
+                <input 
+                  type="number" 
+                  min={0}
+                  value={missedSoFar}
+                  onChange={(e) => setMissedSoFar(Math.max(0, parseInt(e.target.value) || 0))}
+                  className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-2.5 rounded-xl text-sm outline-none focus:border-blue-500 font-bold text-slate-900 dark:text-white"
+                />
+              </div>
             </div>
           </div>
 

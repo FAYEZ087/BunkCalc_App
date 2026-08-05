@@ -1,3 +1,72 @@
 @import "tailwindcss";
 
 @custom-variant dark (&:where(.dark, .dark *));
+
+/* OLED Pitch Black Midnight Mode */
+html.oled,
+html.oled body,
+html.oled #root,
+html.oled .dark\:bg-slate-950,
+html.oled .dark\:bg-slate-900 {
+  background-color: #000000 !important;
+}
+
+html.oled .dark\:border-slate-800 {
+  border-color: #1c1c1e !important;
+}
+
+html.oled .dark\:bg-slate-900\/50,
+html.oled .dark\:bg-slate-800\/50,
+html.oled .dark\:bg-slate-800 {
+  background-color: #0d0d0d !important;
+}
+
+/* Dynamic Accent Themes */
+html.accent-purple .text-blue-500,
+html.accent-purple .text-blue-600 {
+  color: #a855f7 !important;
+}
+html.accent-purple .bg-blue-600,
+html.accent-purple .bg-blue-500 {
+  background-color: #9333ea !important;
+}
+html.accent-purple .border-blue-500 {
+  border-color: #a855f7 !important;
+}
+
+html.accent-emerald .text-blue-500,
+html.accent-emerald .text-blue-600 {
+  color: #10b981 !important;
+}
+html.accent-emerald .bg-blue-600,
+html.accent-emerald .bg-blue-500 {
+  background-color: #059669 !important;
+}
+html.accent-emerald .border-blue-500 {
+  border-color: #10b981 !important;
+}
+
+html.accent-rose .text-blue-500,
+html.accent-rose .text-blue-600 {
+  color: #f43f5e !important;
+}
+html.accent-rose .bg-blue-600,
+html.accent-rose .bg-blue-500 {
+  background-color: #e11d48 !important;
+}
+html.accent-rose .border-blue-500 {
+  border-color: #f43f5e !important;
+}
+
+html.accent-amber .text-blue-500,
+html.accent-amber .text-blue-600 {
+  color: #f59e0b !important;
+}
+html.accent-amber .bg-blue-600,
+html.accent-amber .bg-blue-500 {
+  background-color: #d97706 !important;
+}
+html.accent-amber .border-blue-500 {
+  border-color: #f59e0b !important;
+}
+

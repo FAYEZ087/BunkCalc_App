@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, Suspense, lazy } from 'react';
 import { useSettings } from '../store/useSettings';
 import { useSubjects } from '../store/useSubjects';
 import { useAttendance } from '../store/useAttendance';
 import { exportAppState, importAppState, clearAllStorage, saveToStorage } from '../lib/storage';
-import LegalModal from '../components/LegalModal';
+import HelpTooltip from '../components/HelpTooltip';
+import ThemedIcon from '../components/ThemedIcon';
+import SkeletonLoader from '../components/SkeletonLoader';
 import { v4 as uuidv4 } from 'uuid';
 import type { ArchivedSemester } from '../lib/types';
 import { calculateSubjectStats } from '../lib/calculations';
@@ -11,16 +13,24 @@ import { AppModal } from '../components/AppModal';
 import { sanitizeName, validateArchiveName } from '../lib/validation';
 import { ensureNotificationPermission } from '../lib/permissions';
 
+const LegalModal = lazy(() => import('../components/LegalModal'));
+const FaqSection = lazy(() => import('../components/FaqSection'));
+
 import { Share } from '@capacitor/share';
 
 const Settings: React.FC = () => {
-  const { settings, setSettings, archivedSemesters, archiveSemester, deleteArchivedSemester } = useSettings();
+  const { settings, setSettings, addHoliday, deleteHoliday, archivedSemesters, archiveSemester, deleteArchivedSemester } = useSettings();
   const { subjects, deleteSubject } = useSubjects();
   const { records } = useAttendance();
   const [legal, setLegal] = useState<{ title: string; type: 'privacy' | 'terms' } | null>(null);
   const [showArchiveModal, setShowArchiveModal] = useState(false);
   const [archiveName, setArchiveName] = useState('');
   const [showArchivedList, setShowArchivedList] = useState(false);
+
+  // Holiday Manager State
+  const [holidayName, setHolidayName] = useState('');
+  const [holidayStart, setHolidayStart] = useState('');
+  const [holidayEnd, setHolidayEnd] = useState('');
 
   // AppModal State
   const [modal, setModal] = useState<{
@@ -60,10 +70,10 @@ const Settings: React.FC = () => {
   const handleShare = async () => {
     try {
       await Share.share({
-        title: 'BunkCalc: Attendance Tracker',
-        text: 'Manage your bunks like a pro with BunkCalc! Track attendance, set alerts, and stay safe.',
-        url: 'https://bunkcalc.app', // Placeholder URL
-        dialogTitle: 'Share with Friends',
+        title: 'BunkCalc — Smart Attendance Tracker',
+        text: '🚀 Bunking classes without stressing about attendance? Try BunkCalc!\n\nCalculate your safe bunk budget in real-time, get danger-zone alerts, and stay safe without detention risk. 🎓✨\n\nCheck it out here:',
+        url: 'https://bunk-calc-web.vercel.app/',
+        dialogTitle: 'Share BunkCalc with Friends',
       });
     } catch (err) {
       console.log('Sharing failed', err);
@@ -229,7 +239,13 @@ const Settings: React.FC = () => {
         <div className="bg-slate-50 dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
           <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
             <div>
-              <p className="font-bold text-sm">Attendance Threshold</p>
+              <div className="flex items-center gap-1.5">
+                <p className="font-bold text-sm">Attendance Threshold</p>
+                <HelpTooltip
+                  title="Attendance Threshold"
+                  content="The target percentage required by your college or university (e.g. 75% or 80%). Your bunk budget is calculated based on this."
+                />
+              </div>
               <p className="text-xs text-slate-500 dark:text-slate-400">Minimum required percentage</p>
             </div>
             <select 
@@ -245,7 +261,13 @@ const Settings: React.FC = () => {
 
           <div className="p-4 flex justify-between items-center">
             <div>
-              <p className="font-bold text-sm">Danger Zone Buffer</p>
+              <div className="flex items-center gap-1.5">
+                <p className="font-bold text-sm">Danger Zone Buffer</p>
+                <HelpTooltip
+                  title="Danger Zone Buffer"
+                  content="Buffer percentage above your threshold that triggers warning banners before you fall below the required attendance."
+                />
+              </div>
               <p className="text-xs text-slate-500 dark:text-slate-400">Alert threshold above minimum</p>
             </div>
             <select 
@@ -258,16 +280,121 @@ const Settings: React.FC = () => {
               ))}
             </select>
           </div>
+
+          <div className="p-4 border-t border-slate-200 dark:border-slate-800">
+            <div className="flex items-center gap-1.5 mb-1">
+              <p className="font-bold text-sm">Semester End Date</p>
+              <HelpTooltip
+                title="Semester End Date"
+                content="Defines how many remaining classes exist in the semester pool to compute exact safe bunks."
+              />
+            </div>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">Shared semester timeline for all subjects</p>
+            <input 
+              type="date" 
+              value={settings.semesterEndDate.split('T')[0]}
+              onChange={(e) => setSettings({ ...settings, semesterEndDate: new Date(e.target.value).toISOString() })}
+              className="w-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-sm font-bold outline-none focus:border-blue-500 text-slate-900 dark:text-white"
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* College Holidays & Exam Calendar Manager */}
+      <section className="mb-8">
+        <h2 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-4">College Holidays & Exam Breaks</h2>
+        <div className="bg-slate-50 dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 space-y-4">
+          <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+            Add official college holidays or exam breaks. Dates inside these ranges are automatically excluded from your remaining class budget.
+          </p>
+
+          <div className="space-y-3 bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700">
+            <div>
+              <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">Holiday / Exam Name</label>
+              <input 
+                placeholder="e.g. Durga Puja Break or Mid-Sem Exams"
+                value={holidayName}
+                onChange={(e) => setHolidayName(e.target.value)}
+                className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-2 text-xs font-bold outline-none focus:border-blue-500 text-slate-900 dark:text-white"
+              />
+            </div>
+            <div className="flex gap-3">
+              <div className="flex-1">
+                <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">Start Date</label>
+                <input 
+                  type="date"
+                  value={holidayStart}
+                  onChange={(e) => {
+                    setHolidayStart(e.target.value);
+                    if (!holidayEnd) setHolidayEnd(e.target.value);
+                  }}
+                  className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-2 text-xs font-bold outline-none focus:border-blue-500 text-slate-900 dark:text-white"
+                />
+              </div>
+              <div className="flex-1">
+                <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">End Date</label>
+                <input 
+                  type="date"
+                  value={holidayEnd}
+                  onChange={(e) => setHolidayEnd(e.target.value)}
+                  className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-2 text-xs font-bold outline-none focus:border-blue-500 text-slate-900 dark:text-white"
+                />
+              </div>
+            </div>
+            <button 
+              disabled={!holidayName.trim() || !holidayStart || !holidayEnd}
+              onClick={() => {
+                const sanitized = sanitizeName(holidayName);
+                if (!sanitized) return;
+                addHoliday({
+                  id: uuidv4(),
+                  name: sanitized,
+                  startDate: holidayStart,
+                  endDate: holidayEnd >= holidayStart ? holidayEnd : holidayStart,
+                });
+                setHolidayName('');
+                setHolidayStart('');
+                setHolidayEnd('');
+              }}
+              className="w-full bg-blue-600 hover:bg-blue-500 text-white py-2.5 rounded-lg text-xs font-black uppercase tracking-wider disabled:opacity-50 transition-all"
+            >
+              + Add Holiday Break
+            </button>
+          </div>
+
+          {/* List of Configured Holidays */}
+          <div className="space-y-2">
+            {(!settings.holidays || settings.holidays.length === 0) ? (
+              <p className="text-center text-xs text-slate-400 dark:text-slate-600 italic py-2">No holidays configured.</p>
+            ) : (
+              settings.holidays.map((h) => (
+                <div key={h.id} className="flex justify-between items-center bg-white dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-slate-700 text-xs">
+                  <div>
+                    <p className="font-bold text-slate-900 dark:text-white">{h.name}</p>
+                    <p className="text-[10px] text-slate-500">{h.startDate} to {h.endDate}</p>
+                  </div>
+                  <button 
+                    onClick={() => deleteHoliday(h.id)}
+                    className="text-red-500 p-1.5 hover:bg-red-500/10 rounded-lg transition-colors"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
         </div>
       </section>
 
       <section className="mb-8">
-        <h2 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-4">Notifications</h2>
+        <h2 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-4">Smart Notifications</h2>
         <div className="bg-slate-50 dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
           <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
             <div>
               <p className="font-bold text-sm">Push Notifications</p>
-              <p className="text-xs text-slate-500 dark:text-slate-400">Class reminders and alerts</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Master toggle for alerts & reminders</p>
             </div>
             <button 
               onClick={() => setSettings({ ...settings, notificationsEnabled: !settings.notificationsEnabled })}
@@ -279,27 +406,65 @@ const Settings: React.FC = () => {
 
           {settings.notificationsEnabled && (
             <>
+              {/* Pre-Class Reminders */}
               <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
                 <div>
-                  <p className="font-bold text-sm">Class Reminders</p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">Minutes before class starts</p>
+                  <p className="font-bold text-sm">Pre-Class Reminders</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Alert before class starts</p>
                 </div>
-                <select 
-                  value={settings.reminderMinutesBefore}
-                  onChange={(e) => setSettings({ ...settings, reminderMinutesBefore: Number(e.target.value) as 5 | 10 | 15 | 30 })}
-                  className="bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded p-2 text-sm font-bold outline-none focus:border-blue-500 text-slate-900 dark:text-white"
-                >
-                  <option value={5}>5 mins</option>
-                  <option value={10}>10 mins</option>
-                  <option value={15}>15 mins</option>
-                  <option value={30}>30 mins</option>
-                </select>
+                <div className="flex items-center gap-3">
+                  <select 
+                    value={settings.reminderMinutesBefore}
+                    onChange={(e) => setSettings({ ...settings, reminderMinutesBefore: Number(e.target.value) as 5 | 10 | 15 | 30 })}
+                    className="bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded p-1.5 text-xs font-bold outline-none focus:border-blue-500 text-slate-900 dark:text-white"
+                  >
+                    <option value={5}>5 mins</option>
+                    <option value={10}>10 mins</option>
+                    <option value={15}>15 mins</option>
+                    <option value={30}>30 mins</option>
+                  </select>
+                  <button 
+                    onClick={() => setSettings({ ...settings, preClassReminder: settings.preClassReminder === false ? true : false })}
+                    className={`w-10 h-5 rounded-full transition-colors relative ${settings.preClassReminder !== false ? 'bg-blue-600' : 'bg-slate-300 dark:bg-slate-700'}`}
+                  >
+                    <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all ${settings.preClassReminder !== false ? 'left-5.5' : 'left-0.5'}`}></div>
+                  </button>
+                </div>
               </div>
 
-              <div className="p-4 flex justify-between items-center">
+              {/* Post-Class Attendance Prompts */}
+              <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
+                <div>
+                  <p className="font-bold text-sm">Post-Class Prompts</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Prompt to mark attendance after lecture</p>
+                </div>
+                <button 
+                  onClick={() => setSettings({ ...settings, postClassReminder: settings.postClassReminder === false ? true : false })}
+                  className={`w-12 h-6 rounded-full transition-colors relative ${settings.postClassReminder !== false ? 'bg-blue-600' : 'bg-slate-300 dark:bg-slate-700'}`}
+                >
+                  <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${settings.postClassReminder !== false ? 'left-7' : 'left-1'}`}></div>
+                </button>
+              </div>
+
+              {/* Sunday Night Risk Summary */}
+              <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
+                <div>
+                  <p className="font-bold text-sm">Sunday Risk Summary</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Weekly 8 PM recap for low-budget subjects</p>
+                </div>
+                <button 
+                  onClick={() => setSettings({ ...settings, sundaySummaryNotification: settings.sundaySummaryNotification === false ? true : false })}
+                  className={`w-12 h-6 rounded-full transition-colors relative ${settings.sundaySummaryNotification !== false ? 'bg-blue-600' : 'bg-slate-300 dark:bg-slate-700'}`}
+                >
+                  <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${settings.sundaySummaryNotification !== false ? 'left-7' : 'left-1'}`}></div>
+                </button>
+              </div>
+
+              {/* Holiday Mode */}
+              <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
                 <div>
                   <p className="font-bold text-sm">Holiday Mode</p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">Pause reminders during breaks</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Pause all reminders during breaks</p>
                 </div>
                 <button 
                   onClick={() => setSettings({ ...settings, holidayMode: !settings.holidayMode })}
@@ -312,7 +477,7 @@ const Settings: React.FC = () => {
               <div className="p-4 bg-blue-500/5 flex justify-between items-center">
                 <div>
                   <p className="font-bold text-sm text-blue-600 dark:text-blue-400">System Permissions</p>
-                  <p className="text-[10px] text-slate-500 dark:text-slate-400 italic">Required for alerts to work</p>
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400 italic">Required for device alarms & popups</p>
                 </div>
                 <button 
                   onClick={handleRequestPermission}
@@ -327,30 +492,64 @@ const Settings: React.FC = () => {
       </section>
 
       <section className="mb-8">
-        <h2 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-4">Interaction</h2>
-        <div className="bg-slate-50 dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
-          <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
+        <h2 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-4">Appearance & Theme</h2>
+        <div className="bg-slate-50 dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden divide-y divide-slate-200 dark:divide-slate-800">
+          {/* Mode Selector */}
+          <div className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <p className="font-bold text-sm">Theme</p>
-              <p className="text-xs text-slate-500 dark:text-slate-400">App appearance mode</p>
+              <p className="font-bold text-sm">Theme Mode</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">App appearance style</p>
             </div>
-            <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl gap-1">
-              {(['light', 'dark', 'system'] as const).map((t) => (
+            <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl gap-1 overflow-x-auto">
+              {[
+                { id: 'light', label: 'Light' },
+                { id: 'dark', label: 'Dark' },
+                { id: 'oled', label: 'Pitch OLED' },
+                { id: 'system', label: 'Auto' }
+              ].map((t) => (
                 <button
-                  key={t}
-                  onClick={() => setSettings({ ...settings, theme: t })}
-                  className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${
-                    settings.theme === t 
-                      ? 'bg-blue-600 text-white shadow-lg' 
+                  key={t.id}
+                  onClick={() => setSettings({ ...settings, theme: t.id as any })}
+                  className={`px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all whitespace-nowrap ${
+                    settings.theme === t.id 
+                      ? 'bg-blue-600 text-white shadow-md' 
                       : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
                   }`}
                 >
-                  {t}
+                  {t.label}
                 </button>
               ))}
             </div>
           </div>
 
+          {/* Accent Color Picker */}
+          <div className="p-4 flex justify-between items-center">
+            <div>
+              <p className="font-bold text-sm">Accent Theme</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Primary UI highlight color</p>
+            </div>
+            <div className="flex items-center gap-2">
+              {[
+                { id: 'blue', color: 'bg-blue-500', name: 'Classic Blue' },
+                { id: 'purple', color: 'bg-purple-500', name: 'Neon Purple' },
+                { id: 'emerald', color: 'bg-emerald-500', name: 'Emerald Green' },
+                { id: 'amber', color: 'bg-amber-500', name: 'Gold Amber' },
+                { id: 'rose', color: 'bg-rose-500', name: 'Rose Red' }
+              ].map((acc) => (
+                <button
+                  key={acc.id}
+                  title={acc.name}
+                  onClick={() => setSettings({ ...settings, themeAccent: acc.id as any })}
+                  className={`w-6 h-6 rounded-full ${acc.color} transition-transform ${
+                    (settings.themeAccent || 'blue') === acc.id 
+                      ? 'ring-2 ring-offset-2 ring-slate-900 dark:ring-white scale-110' 
+                      : 'opacity-70 hover:opacity-100'
+                  }`}
+                />
+              ))}
+            </div>
+          </div>
+          {/* Haptic Feedback */}
           <div className="p-4 flex justify-between items-center">
             <div>
               <p className="font-bold text-sm">Haptic Feedback</p>
@@ -358,7 +557,7 @@ const Settings: React.FC = () => {
             </div>
             <button 
               onClick={() => setSettings({ ...settings, hapticsEnabled: !settings.hapticsEnabled })}
-              className={`w-12 h-6 rounded-full transition-colors relative ${settings.hapticsEnabled ? 'bg-purple-600' : 'bg-slate-300 dark:bg-slate-700'}`}
+              className={`w-12 h-6 rounded-full transition-colors relative ${settings.hapticsEnabled ? 'bg-blue-600' : 'bg-slate-300 dark:bg-slate-700'}`}
             >
               <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${settings.hapticsEnabled ? 'left-7' : 'left-1'}`}></div>
             </button>
@@ -492,6 +691,13 @@ const Settings: React.FC = () => {
       </section>
 
       <section className="mb-8">
+        <h2 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-4">Frequently Asked Questions (FAQ)</h2>
+        <Suspense fallback={<SkeletonLoader height="h-48" />}>
+          <FaqSection />
+        </Suspense>
+      </section>
+
+      <section className="mb-8">
         <h2 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-4">Support & Social</h2>
         <div className="bg-slate-50 dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
           <button 
@@ -506,9 +712,7 @@ const Settings: React.FC = () => {
               </div>
               <span className="text-sm font-bold text-slate-900 dark:text-white">Rate App</span>
             </div>
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-slate-400 dark:text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
+            <ThemedIcon name="chevronRight" size={16} className="text-slate-400 dark:text-slate-600" />
           </button>
           
           <button 
@@ -517,20 +721,16 @@ const Settings: React.FC = () => {
           >
             <div className="flex items-center gap-3">
               <div className="bg-blue-500/20 p-2 rounded-lg">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-500" viewBox="0 0 20 20" fill="currentColor">
-                  <path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.683-1.866l-4.94-2.47a3.046 3.046 0 000-.756l4.94-2.47A3 3 0 0015 8z" />
-                </svg>
+                <ThemedIcon name="share" size={20} className="text-blue-500" />
               </div>
               <span className="text-sm font-bold text-slate-900 dark:text-white">Share with Friends</span>
             </div>
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-slate-400 dark:text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
+            <ThemedIcon name="chevronRight" size={16} className="text-slate-400 dark:text-slate-600" />
           </button>
 
           <button 
             onClick={handleFeedback}
-            className="w-full p-4 flex justify-between items-center hover:bg-slate-100 dark:hover:bg-slate-800/50 transition-colors"
+            className="w-full p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center hover:bg-slate-100 dark:hover:bg-slate-800/50 transition-colors"
           >
             <div className="flex items-center gap-3">
               <div className="bg-green-500/20 p-2 rounded-lg">
@@ -541,10 +741,28 @@ const Settings: React.FC = () => {
               </div>
               <span className="text-sm font-bold text-slate-900 dark:text-white">Send Feedback</span>
             </div>
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-slate-400 dark:text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
+            <ThemedIcon name="chevronRight" size={16} className="text-slate-400 dark:text-slate-600" />
           </button>
+
+          <a 
+            href="https://github.com/FAYEZ087"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full p-4 flex justify-between items-center hover:bg-slate-100 dark:hover:bg-slate-800/50 transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <div className="bg-purple-500/20 p-2 rounded-lg">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-purple-500" fill="currentColor" viewBox="0 0 24 24">
+                  <path fillRule="evenodd" clipRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-sm font-bold text-slate-900 dark:text-white">Developer (FAYEZ087)</p>
+                <p className="text-[10px] text-slate-500 dark:text-slate-400">Visit GitHub profile @FAYEZ087</p>
+              </div>
+            </div>
+            <ThemedIcon name="chevronRight" size={16} className="text-slate-400 dark:text-slate-600" />
+          </a>
         </div>
       </section>
 
@@ -553,33 +771,39 @@ const Settings: React.FC = () => {
         <div className="bg-slate-50 dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden text-sm">
           <button 
             onClick={() => setLegal({ title: 'Privacy Policy', type: 'privacy' })}
-            className="w-full p-4 border-b border-slate-200 dark:border-slate-800 text-left hover:bg-slate-100 dark:hover:bg-slate-800/50 transition-colors font-bold text-slate-600 dark:text-slate-300"
+            className="w-full p-4 border-b border-slate-200 dark:border-slate-800 text-left hover:bg-slate-100 dark:hover:bg-slate-800/50 transition-colors font-bold text-slate-600 dark:text-slate-300 flex justify-between items-center"
           >
-            Privacy Policy
+            <span>Privacy Policy</span>
+            <ThemedIcon name="chevronRight" size={16} className="text-slate-400 dark:text-slate-600" />
           </button>
           <button 
             onClick={() => setLegal({ title: 'Terms of Service', type: 'terms' })}
-            className="w-full p-4 border-b border-slate-200 dark:border-slate-800 text-left hover:bg-slate-100 dark:hover:bg-slate-800/50 transition-colors font-bold text-slate-600 dark:text-slate-300"
+            className="w-full p-4 border-b border-slate-200 dark:border-slate-800 text-left hover:bg-slate-100 dark:hover:bg-slate-800/50 transition-colors font-bold text-slate-600 dark:text-slate-300 flex justify-between items-center"
           >
-            Terms of Service
+            <span>Terms of Service</span>
+            <ThemedIcon name="chevronRight" size={16} className="text-slate-400 dark:text-slate-600" />
           </button>
           <div className="p-4 flex justify-between items-center">
             <span className="font-bold text-slate-500 dark:text-slate-400">App Version</span>
-            <span className="text-slate-500 dark:text-slate-400 font-black tracking-widest uppercase text-xs">v1.1.0</span>
+            <span className="text-slate-500 dark:text-slate-400 font-black tracking-widest uppercase text-xs">v1.1.2</span>
           </div>
         </div>
       </section>
 
       {legal && (
-        <LegalModal 
-          title={legal.title}
-          type={legal.type}
-          onClose={() => setLegal(null)}
-        />
+        <Suspense fallback={<SkeletonLoader height="h-64" />}>
+          <LegalModal 
+            title={legal.title}
+            type={legal.type}
+            onClose={() => setLegal(null)}
+          />
+        </Suspense>
       )}
 
       <div className="mt-auto pt-8">
-        <p className="text-center text-slate-400 dark:text-slate-600 text-[10px] font-bold uppercase tracking-widest mb-1">Made for KIITians</p>
+        <p className="text-center text-slate-400 dark:text-slate-600 text-[10px] font-bold uppercase tracking-widest mb-1">
+          Made with ❤️ by <a href="https://github.com/FAYEZ087" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">FAYEZ087</a> for KIITians
+        </p>
         <p className="text-center text-slate-300 dark:text-slate-800 text-[8px] font-black uppercase">© 2026 BunkCalc. All Rights Reserved.</p>
       </div>
 

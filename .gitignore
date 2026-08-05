@@ -7,16 +7,31 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+dist-ssr/
+build/
 *.local
 
-# Editor directories and files
+# Capacitor & Android build artifacts
+android/.gradle/
+android/app/build/
+android/build/
+android/local.properties
+android/app/release/
+android/app/src/main/assets/public/
+android/app/src/main/assets/capacitor.config.json
+android/app/src/main/assets/capacitor.plugins.json
+android/capacitor-cordova-android-plugins/
+
+# IDE & Editor directories
 .vscode/*
 !.vscode/extensions.json
-.idea
-.DS_Store
+.idea/
+*.iml
 *.suo
 *.ntvs*
 *.njsproj
@@ -28,15 +43,11 @@ dist-ssr
 .env.*
 !.env.example
 
-# Android build secrets
-# local.properties contains the Android SDK path (machine-specific, not a secret per se,
-# but it is machine-specific and should never be committed)
-android/local.properties
-
 # Android signing keystores — NEVER commit these
 *.jks
 *.keystore
-android/app/release/
 
-# OS files
+# OS generated files
+.DS_Store
 Thumbs.db
+

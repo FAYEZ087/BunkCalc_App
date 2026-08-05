@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import type { Subject } from '../lib/types';
 import { useAttendance } from '../store/useAttendance';
 import { useSettings } from '../store/useSettings';
@@ -8,10 +8,10 @@ const AlertBanner: React.FC<{ subjects: Subject[] }> = ({ subjects }) => {
   const { records } = useAttendance();
   const { settings } = useSettings();
 
-  const atRiskSubjects = subjects.filter((s) => {
-    const stats = calculateSubjectStats(s, records);
-    return stats.attendancePct < (settings.globalThreshold + settings.warningBuffer) * 100;
-  });
+  const atRiskSubjects = useMemo(() => subjects.filter((s) => {
+    const stats = calculateSubjectStats(s, records, settings.semesterEndDate, settings.holidays);
+    return stats.bunkBudget <= 3 || stats.attendancePct < (settings.globalThreshold + settings.warningBuffer) * 100;
+  }), [subjects, records, settings.semesterEndDate, settings.holidays, settings.globalThreshold, settings.warningBuffer]);
 
   if (atRiskSubjects.length === 0) return null;
 

@@ -9,7 +9,7 @@ interface Props {
 }
 
 const GlobalHistory: React.FC<Props> = ({ onBack }) => {
-  const { records, unmarkAttendance } = useAttendance();
+  const { records, unmarkAttendance, markAttendance } = useAttendance();
   const { subjects } = useSubjects();
 
   const sortedRecords = [...records].sort((a, b) => b.date.localeCompare(a.date));
@@ -44,12 +44,23 @@ const GlobalHistory: React.FC<Props> = ({ onBack }) => {
                   {parseLocalDate(record.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', weekday: 'short' })}
                 </p>
                 <h4 className="font-bold text-sm truncate text-slate-900 dark:text-white">{getSubjectName(record.subjectId)}</h4>
-                <p className={`text-[10px] font-black uppercase mt-1 ${
-                  record.status === 'present' ? 'text-green-500' : 
-                  record.status === 'absent' ? 'text-red-500' : 'text-slate-500'
-                }`}>
-                  {record.status}
-                </p>
+                {record.status !== 'cancelled' ? (
+                  <button 
+                    onClick={() => markAttendance({ ...record, status: record.status === 'present' ? 'absent' : 'present' })}
+                    className={`flex items-center gap-1 text-[10px] font-black uppercase mt-1 px-2 py-1 -ml-2 rounded hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors ${
+                      record.status === 'present' ? 'text-green-500' : 'text-red-500'
+                    }`}
+                  >
+                    {record.status}
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                    </svg>
+                  </button>
+                ) : (
+                  <p className="text-[10px] font-black uppercase mt-1 text-slate-500">
+                    {record.status}
+                  </p>
+                )}
               </div>
               <button 
                 onClick={() => unmarkAttendance(record.id)}

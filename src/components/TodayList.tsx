@@ -7,6 +7,7 @@ import type { AttendanceStatus, Subject } from '../lib/types';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import UndoToast from './UndoToast';
 import { AppModal } from './AppModal';
+import CelebrationOverlay from './CelebrationOverlay';
 
 import { calculateSubjectStats } from '../lib/calculations';
 
@@ -21,8 +22,9 @@ const TodayList: React.FC = () => {
   const pointerStart = useRef<{ x: number; y: number; id: string } | null>(null);
   const isSwipingRef = useRef(false);
 
-  // Toast state
+  // Toast & Celebration state
   const [toast, setToast] = useState<{ subjectName: string; status: AttendanceStatus } | null>(null);
+  const [celebration, setCelebration] = useState<'present' | 'absent' | null>(null);
 
   // Modal Dialog state for validation/errors
   const [modal, setModal] = useState<{
@@ -40,7 +42,7 @@ const TodayList: React.FC = () => {
     const threshold = subject.threshold * 100;
     const warningZone = (subject.threshold + settings.warningBuffer) * 100;
     
-    const newTotal = stats.totalClasses + subject.labMultiplier;
+    const newTotal = stats.totalClasses + 1;
     const newPct = (stats.attendedCount / newTotal) * 100;
 
     if (newPct < threshold) return { label: 'CRITICAL', color: 'bg-red-500 text-white' };
@@ -102,8 +104,27 @@ const TodayList: React.FC = () => {
     setSwipeOffsets(prev => ({ ...prev, [subjectId]: 0 }));
     setSnappedLeft(prev => ({ ...prev, [subjectId]: false }));
 
-    // Show undo toast
+    // Show undo toast & visual celebration feedback
     setToast({ subjectName, status });
+    if (status === 'present' || status === 'absent') {
+      setCelebration(status);
+    }
+
+    // Show cancelled class explanation if status is cancelled
+    if (status === 'cancelled') {
+      const hasSeen = localStorage.getItem('has_seen_cancelled_tooltip');
+      if (!hasSeen) {
+        localStorage.setItem('has_seen_cancelled_tooltip', 'true');
+        setModal({
+          isOpen: true,
+          title: "Cancelled Class Behavior",
+          message: "A cancelled class shrinks your total semester session pool. This slightly reduces your bunk budget — it does not count as a free bunk.",
+          type: "alert",
+          confirmText: "Got It",
+          onConfirm: () => setModal(null)
+        });
+      }
+    }
   }, [settings.hapticsEnabled, markAttendance, dateStr, subjects]);
 
   const handleUndo = useCallback(async () => {
@@ -224,6 +245,7 @@ const TodayList: React.FC = () => {
 
   return (
     <>
+
       {/* Swipe hint */}
       <div className="text-center mb-4">
         <p className="text-[10px] text-slate-400 dark:text-slate-600 font-bold uppercase tracking-widest">
@@ -340,7 +362,7 @@ const TodayList: React.FC = () => {
                       {slotTime}
                     </span>
                     <span className="text-slate-500 dark:text-slate-500 text-[10px] font-bold uppercase tracking-widest">
-                      {subject.labMultiplier === 2 ? 'Lab Session' : 'Theory'}
+                      {subject.isLab ? 'Lab Session' : 'Theory'}
                     </span>
                   </div>
                 </div>
@@ -416,6 +438,9 @@ const TodayList: React.FC = () => {
           onDismiss={handleDismissToast}
         />
       )}
+
+      {/* Celebration & Warning Overlay */}
+      <CelebrationOverlay type={celebration} onDone={() => setCelebration(null)} />
 
       {/* AppModal fallback for Class Not Started alert */}
       {modal && (

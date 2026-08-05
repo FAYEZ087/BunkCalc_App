@@ -4,7 +4,7 @@ import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
 
-const STORAGE_VERSION = 2;
+const STORAGE_VERSION = 3;
 
 export const saveToStorage = async (key: string, value: any) => {
   await Preferences.set({
@@ -38,6 +38,19 @@ export const migrateStorageIfNeeded = async () => {
     const existing = await getFromStorage('archived_semesters');
     if (!existing) {
       await saveToStorage('archived_semesters', []);
+    }
+  }
+
+  if (!version || version < 3) {
+    // v2 → v3: Patch subjects with default attendedSoFar: 0 and missedSoFar: 0 if undefined
+    const storedSubjects = await getFromStorage<any[]>('subjects');
+    if (storedSubjects && Array.isArray(storedSubjects)) {
+      const patchedSubjects = storedSubjects.map((s) => ({
+        ...s,
+        attendedSoFar: s.attendedSoFar ?? 0,
+        missedSoFar: s.missedSoFar ?? 0,
+      }));
+      await saveToStorage('subjects', patchedSubjects);
     }
     await saveToStorage('storage_version', STORAGE_VERSION);
   }

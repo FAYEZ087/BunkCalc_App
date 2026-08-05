@@ -110,8 +110,11 @@ function validateSubject(sub: any): { valid: boolean; data?: any } {
     if (!validateScheduleSlot(slot)) return { valid: false };
   }
   
-  if (sub.labMultiplier !== 1 && sub.labMultiplier !== 2) return { valid: false };
+  const isLab = typeof sub.isLab === 'boolean' ? sub.isLab : sub.labMultiplier === 2;
   
+  const attendedSoFar = isNumber(sub.attendedSoFar) && sub.attendedSoFar >= 0 ? Math.floor(sub.attendedSoFar) : 0;
+  const missedSoFar = isNumber(sub.missedSoFar) && sub.missedSoFar >= 0 ? Math.floor(sub.missedSoFar) : 0;
+
   return {
     valid: true,
     data: {
@@ -120,7 +123,9 @@ function validateSubject(sub: any): { valid: boolean; data?: any } {
       credits: sub.credits,
       threshold: sub.threshold,
       schedule: sub.schedule.map((s: any) => ({ day: s.day, slot: s.slot })),
-      labMultiplier: sub.labMultiplier
+      isLab,
+      attendedSoFar,
+      missedSoFar
     }
   };
 }
@@ -155,16 +160,24 @@ function validateSettings(set: any): { valid: boolean; data?: any } {
   if (!isBoolean(set.holidayMode)) return { valid: false };
   if (!isBoolean(set.hapticsEnabled)) return { valid: false };
   
-  if (set.theme !== 'light' && set.theme !== 'dark' && set.theme !== 'system') return { valid: false };
+  const validThemes = ['light', 'dark', 'oled', 'system'];
+  if (!validThemes.includes(set.theme)) return { valid: false };
+
+  const validAccents = ['blue', 'purple', 'emerald', 'amber', 'rose'];
+  const themeAccent = validAccents.includes(set.themeAccent) ? set.themeAccent : 'blue';
   
   const result: any = {
     globalThreshold: set.globalThreshold,
     warningBuffer: set.warningBuffer,
     notificationsEnabled: set.notificationsEnabled,
+    preClassReminder: set.preClassReminder !== false,
+    postClassReminder: set.postClassReminder !== false,
+    sundaySummaryNotification: set.sundaySummaryNotification !== false,
     reminderMinutesBefore: set.reminderMinutesBefore,
     holidayMode: set.holidayMode,
     hapticsEnabled: set.hapticsEnabled,
-    theme: set.theme
+    theme: set.theme,
+    themeAccent,
   };
 
   if (set.semesterEndDate !== undefined) {

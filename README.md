@@ -4,7 +4,7 @@
 
 ### _Take Control of Your College Life._
 
-[![Version](https://img.shields.io/badge/version-1.1.0-blue?style=for-the-badge)](https://github.com/bunkcalc)
+[![Version](https://img.shields.io/badge/version-1.1.2-blue?style=for-the-badge)](https://github.com/bunkcalc)
 [![Platform](https://img.shields.io/badge/platform-Android-3ddc84?style=for-the-badge&logo=android&logoColor=white)](https://github.com/bunkcalc)
 [![License](https://img.shields.io/badge/license-Private-red?style=for-the-badge)](https://github.com/bunkcalc)
 [![React](https://img.shields.io/badge/React-19-61dafb?style=for-the-badge&logo=react&logoColor=white)](https://react.dev)
@@ -207,6 +207,6 @@ This project is **private** and not open-source. All rights reserved.
 
 **Built with ❤️ for students who know when to show up — and when not to.**
 
-`v1.1.0` · `com.bunkcalc.app`
+`v1.1.2` · `com.bunkcalc.app`
 
 </div>

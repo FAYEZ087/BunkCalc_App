@@ -1,11 +1,13 @@
 import { create } from 'zustand';
-import type { AppSettings, ArchivedSemester } from '../lib/types';
+import type { AppSettings, ArchivedSemester, Holiday } from '../lib/types';
 import { saveToStorage, getFromStorage } from '../lib/storage';
 
 interface SettingsState {
   settings: AppSettings;
   archivedSemesters: ArchivedSemester[];
   setSettings: (settings: AppSettings) => void;
+  addHoliday: (holiday: Holiday) => void;
+  deleteHoliday: (id: string) => void;
   loadSettings: () => Promise<void>;
   loadArchivedSemesters: () => Promise<void>;
   archiveSemester: (semester: ArchivedSemester) => Promise<void>;
@@ -17,10 +19,15 @@ const defaultSettings: AppSettings = {
   globalThreshold: 0.75,
   warningBuffer: 0.05,
   notificationsEnabled: true,
+  preClassReminder: true,
+  postClassReminder: true,
+  sundaySummaryNotification: true,
   reminderMinutesBefore: 10,
   holidayMode: false,
   hapticsEnabled: true,
   theme: 'dark',
+  themeAccent: 'blue',
+  holidays: [],
 };
 
 export const useSettings = create<SettingsState>((set, get) => ({
@@ -29,15 +36,36 @@ export const useSettings = create<SettingsState>((set, get) => ({
   setSettings: (settings) => {
     set({ settings });
     saveToStorage('app_settings', settings);
-    applyTheme(settings.theme);
+    applyTheme(settings.theme, settings.themeAccent);
+  },
+  addHoliday: (holiday) => {
+    const currentSettings = get().settings;
+    const currentHolidays = currentSettings.holidays || [];
+    const updatedSettings: AppSettings = {
+      ...currentSettings,
+      holidays: [...currentHolidays, holiday],
+    };
+    set({ settings: updatedSettings });
+    saveToStorage('app_settings', updatedSettings);
+  },
+  deleteHoliday: (id) => {
+    const currentSettings = get().settings;
+    const currentHolidays = currentSettings.holidays || [];
+    const updatedSettings: AppSettings = {
+      ...currentSettings,
+      holidays: currentHolidays.filter((h) => h.id !== id),
+    };
+    set({ settings: updatedSettings });
+    saveToStorage('app_settings', updatedSettings);
   },
   loadSettings: async () => {
     const stored = await getFromStorage<AppSettings>('app_settings');
     if (stored) {
-      set({ settings: stored });
-      applyTheme(stored.theme);
+      const merged = { ...defaultSettings, ...stored, holidays: stored.holidays || [] };
+      set({ settings: merged });
+      applyTheme(merged.theme, merged.themeAccent);
     } else {
-      applyTheme(defaultSettings.theme);
+      applyTheme(defaultSettings.theme, defaultSettings.themeAccent);
     }
   },
   loadArchivedSemesters: async () => {
@@ -58,13 +86,23 @@ export const useSettings = create<SettingsState>((set, get) => ({
   },
 }));
 
-function applyTheme(theme: 'light' | 'dark' | 'system') {
+function applyTheme(theme: 'light' | 'dark' | 'oled' | 'system', accent: 'blue' | 'purple' | 'emerald' | 'amber' | 'rose' = 'blue') {
   const root = window.document.documentElement;
-  const isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  const isDark = theme === 'dark' || theme === 'oled' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  const isOled = theme === 'oled';
   
   if (isDark) {
     root.classList.add('dark');
   } else {
     root.classList.remove('dark');
   }
+
+  if (isOled) {
+    root.classList.add('oled');
+  } else {
+    root.classList.remove('oled');
+  }
+
+  root.classList.remove('accent-blue', 'accent-purple', 'accent-emerald', 'accent-amber', 'accent-rose');
+  root.classList.add(`accent-${accent || 'blue'}`);
 }
