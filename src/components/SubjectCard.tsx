@@ -21,27 +21,44 @@ const SubjectCard: React.FC<Props> = ({ subject, onClick, onEdit, onDelete }) =>
 
   const isRecoveryMode = stats.bunkBudget < 0;
 
-  const handleCardClick = async () => {
+  const menuRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    if (!showMenu) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setShowMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showMenu]);
+
+  const triggerHaptics = async (style: ImpactStyle) => {
     if (settings.hapticsEnabled) {
-      await Haptics.impact({ style: ImpactStyle.Light });
+      try {
+        await Haptics.impact({ style });
+      } catch (e) {
+        // Safe fallback for web
+      }
     }
+  };
+
+  const handleCardClick = async () => {
+    await triggerHaptics(ImpactStyle.Light);
     onClick();
   };
 
   const handleMenuClick = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (settings.hapticsEnabled) {
-      await Haptics.impact({ style: ImpactStyle.Light });
-    }
+    await triggerHaptics(ImpactStyle.Light);
     setShowMenu(!showMenu);
   };
 
   const handleAction = async (e: React.MouseEvent, action: () => void) => {
     e.stopPropagation();
     setShowMenu(false);
-    if (settings.hapticsEnabled) {
-      await Haptics.impact({ style: ImpactStyle.Medium });
-    }
+    await triggerHaptics(ImpactStyle.Medium);
     action();
   };
 
@@ -77,7 +94,7 @@ const SubjectCard: React.FC<Props> = ({ subject, onClick, onEdit, onDelete }) =>
             {stats.attendancePct.toFixed(1)}%
           </div>
           
-          <div className="relative">
+          <div className="relative" ref={menuRef}>
             <button 
               onClick={handleMenuClick}
               className="p-1 text-slate-400 dark:text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors"

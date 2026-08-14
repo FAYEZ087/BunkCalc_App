@@ -15,7 +15,7 @@ interface SettingsState {
 }
 
 const defaultSettings: AppSettings = {
-  semesterEndDate: new Date(new Date().getFullYear(), 11, 31).toISOString(),
+  semesterEndDate: `${new Date().getFullYear()}-12-31`,
   globalThreshold: 0.75,
   warningBuffer: 0.05,
   notificationsEnabled: true,

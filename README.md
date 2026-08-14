@@ -4,14 +4,14 @@
 
 ### _Take Control of Your College Life._
 
-[![Version](https://img.shields.io/badge/version-1.1.2-blue?style=for-the-badge)](https://github.com/bunkcalc)
+[![Version](https://img.shields.io/badge/version-2.0.0-blue?style=for-the-badge)](https://github.com/bunkcalc)
 [![Platform](https://img.shields.io/badge/platform-Android-3ddc84?style=for-the-badge&logo=android&logoColor=white)](https://github.com/bunkcalc)
 [![License](https://img.shields.io/badge/license-Private-red?style=for-the-badge)](https://github.com/bunkcalc)
 [![React](https://img.shields.io/badge/React-19-61dafb?style=for-the-badge&logo=react&logoColor=white)](https://react.dev)
 [![Capacitor](https://img.shields.io/badge/Capacitor-8-119eff?style=for-the-badge&logo=capacitor&logoColor=white)](https://capacitorjs.com)
 
 The **ultimate proactive attendance tracker** built for university students.  
-Smart math. Timely alerts. Beautiful UI. Zero data collection.
+Smart math. Bunk simulator. Trend analytics. CSV/PDF exports. Zero data collection.
 
 ---
 
@@ -21,18 +21,22 @@ Smart math. Timely alerts. Beautiful UI. Zero data collection.
 
 | Feature | Description |
 |---|---|
-| 📊 **Proactive Calculations** | Know exactly how many classes to attend to hit 75%, or how many you can safely skip |
-| 🔔 **Smart Notifications** | Pre-class reminders and post-class attendance prompts, all scheduled locally on-device |
-| 📅 **Today View** | See your daily schedule at a glance with one-tap attendance marking |
+| 📊 **Weekly Attendance Trends** | 8-week visual bar chart tracking your weekly attendance percentage against your threshold |
+| 🔮 **"What-If" Bunk Simulator** | Predict your exact percentage before skipping upcoming classes with instant recovery estimates |
+| ⏳ **Semester Progress Bar** | Real-time timeline bar tracking weeks remaining in the semester and elapsed class days |
+| 🔄 **Swipe-to-Undo & Re-mark** | Re-swipe marked subject cards anytime to update status between Present, Absent, and Cancelled |
+| 📂 **CSV & PDF Exports** | Download your complete attendance records as CSV spreadsheets or export formatted PDF reports |
+| 🔍 **History Search & Filters** | Filter attendance logs by subject, status (Present/Absent/Cancelled), or custom date range |
+| 🛡️ **Delete Safety Confirmations** | Built-in confirmation dialogs prevent accidental deletion of attendance records or subject profiles |
+| 🔔 **Smart Local Notifications** | Pre-class reminders and post-class attendance prompts, all scheduled collision-free locally on-device |
+| 📅 **Today View** | See your daily schedule at a glance with interactive swipe-marking |
 | 📈 **Statistics Dashboard** | Rich analytics with per-subject and overall attendance percentages |
 | 🗂️ **Semester Archives** | Automatically archive past semesters and browse your academic history |
-| 🎨 **Share Cards** | Generate beautiful attendance summary cards to share with friends |
 | 🧪 **Lab Support** | Lab multiplier (1×/2×) matches university standards for practical classes |
-| 🌙 **Dark Mode** | System-aware theming with light, dark, and auto modes |
+| 🌙 **Dark & OLED Mode** | System-aware theming with light, dark, oled, and custom accent colors |
 | 📴 **Fully Offline** | All data stored locally on-device — no internet, no servers, no tracking |
 | 📤 **Import / Export** | Backup and restore your data via validated JSON files |
-| 🎬 **Splash Animation** | Custom branded launch animation with skip-on-tap support |
-| 🔐 **Security Hardened** | CSP headers, strict input validation, prototype pollution prevention |
+| 🔐 **Security Hardened** | Strict CSP, input sanitisation, schema validation, prototype pollution prevention |
 
 ---
 
@@ -59,7 +63,7 @@ Share          @capacitor/share
 BunkCalc1/
 ├── android/                  # Native Android project (Capacitor-managed)
 │   └── app/
-│       ├── build.gradle      # Android build config (versionCode 2, v1.1.0)
+│       ├── build.gradle      # Android build config (versionCode 5, v2.0.0)
 │       └── src/main/
 │           ├── assets/       # Synced web bundle + public assets
 │           └── res/          # Launcher icons (mdpi → xxxhdpi) + splash
@@ -72,11 +76,14 @@ BunkCalc1/
 │   └── app_launching_animation.mp4
 ├── src/
 │   ├── components/           # Reusable UI components
+│   │   ├── WeeklyChart.tsx      # 8-week attendance trend chart
+│   │   ├── WhatIfSimulator.tsx  # Bunk prediction simulator
+│   │   ├── SemesterProgress.tsx # Semester timeline progress bar
 │   │   ├── SplashScreen.tsx     # Branded launch animation
 │   │   ├── BottomNav.tsx        # Tab navigation
 │   │   ├── SubjectCard.tsx      # Subject attendance card
 │   │   ├── SubjectModal.tsx     # Add/edit subject modal
-│   │   ├── TodayList.tsx        # Daily schedule list
+│   │   ├── TodayList.tsx        # Daily schedule list (swipe-to-undo)
 │   │   ├── TimetableGrid.tsx    # Weekly timetable grid
 │   │   ├── ShareCard.tsx        # Shareable attendance card
 │   │   ├── OnboardingCarousel.tsx
@@ -86,13 +93,14 @@ BunkCalc1/
 │   │   ├── AppModal.tsx
 │   │   └── UndoToast.tsx
 │   ├── pages/                # Screen-level views
-│   │   ├── Home.tsx             # Dashboard
+│   │   ├── Home.tsx             # Dashboard (with semester timeline)
 │   │   ├── Today.tsx            # Today's schedule
-│   │   ├── Statistics.tsx       # Analytics
-│   │   ├── Settings.tsx         # App settings
+│   │   ├── Statistics.tsx       # Analytics (with WeeklyChart & WhatIfSimulator)
+│   │   ├── Settings.tsx         # App settings (with CSV/PDF export & What's New)
 │   │   ├── Setup.tsx            # First-run setup
 │   │   ├── SubjectDetail.tsx    # Individual subject view
-│   │   └── GlobalHistory.tsx    # Semester archive browser
+│   │   ├── GlobalHistory.tsx    # History log browser (search/filter/pagination)
+│   │   └── CalendarView.tsx     # Calendar view
 │   ├── store/                # Zustand state management
 │   │   ├── useSubjects.ts
 │   │   ├── useAttendance.ts
@@ -100,9 +108,9 @@ BunkCalc1/
 │   ├── lib/                  # Business logic & utilities
 │   │   ├── calculations.ts      # Attendance math engine
 │   │   ├── validation.ts        # Input sanitisation & import validation
-│   │   ├── notifications.ts     # Local notification scheduling
+│   │   ├── notifications.ts     # Local notification scheduling (collision-free)
 │   │   ├── permissions.ts       # Native permission requests
-│   │   ├── storage.ts           # Data migration & persistence
+│   │   ├── storage.ts           # Data migration, persistence, & CSV/PDF export
 │   │   ├── shareCard.ts         # Share card image generation
 │   │   └── types.ts             # TypeScript type definitions
 │   ├── App.tsx               # Root component
@@ -167,7 +175,7 @@ BunkCalc takes security seriously, even as a fully offline application:
 |---|---|
 | **Content Security Policy** | Strict CSP meta tag blocks all external scripts, styles, and connections |
 | **Input Sanitisation** | All user inputs are stripped of HTML, script tags, control characters, and zero-width unicode |
-| **Import Validation** | JSON import payloads are schema-validated with prototype pollution detection |
+| **Import Validation** | JSON import payloads are schema-validated with prototype pollution detection & date validation |
 | **Type Safety** | Full TypeScript with strict mode across the entire codebase |
 | **No Secrets in Code** | Zero API keys, tokens, or credentials — the app has no backend |
 | **Secure Storage** | Data persisted via Capacitor Preferences (Android SharedPreferences, encrypted) |
@@ -179,7 +187,7 @@ BunkCalc takes security seriously, even as a fully offline application:
 - **Local-first**: Your data never leaves your device
 - **Proactive, not reactive**: The app tells you what to do _before_ it's too late
 - **Respectful**: No ads, no tracking, no analytics, no subscriptions
-- **Beautiful**: Polished dark/light UI with micro-animations and haptic feedback
+- **Beautiful**: Polished dark/light/OLED UI with micro-animations and haptic feedback
 - **Accessible**: Designed for one-handed use with a clear information hierarchy
 
 ---
@@ -207,6 +215,6 @@ This project is **private** and not open-source. All rights reserved.
 
 **Built with ❤️ for students who know when to show up — and when not to.**
 
-`v1.1.2` · `com.bunkcalc.app`
+`v2.0.0` · `com.bunkcalc.app`
 
 </div>

@@ -10,7 +10,7 @@ interface SubjectsState {
   loadSubjects: () => Promise<void>;
 }
 
-export const useSubjects = create<SubjectsState>((set) => ({
+export const useSubjects = create<SubjectsState>((set, get) => ({
   subjects: [],
   addSubject: (subject) => {
     set((state) => {
@@ -26,25 +26,27 @@ export const useSubjects = create<SubjectsState>((set) => ({
       return { subjects: newSubjects };
     });
   },
-  deleteSubject: (id) => {
-    set((state) => {
-      const newSubjects = state.subjects.filter((s) => s.id !== id);
-      saveToStorage('subjects', newSubjects);
-      
-      // Clean up notifications and attendance records asynchronously to avoid circular dependency
-      import('../lib/notifications').then(({ cancelSubjectNotifications }) => {
-        cancelSubjectNotifications(id).catch(err => console.error('Failed to cancel notifications:', err));
-      });
-      
-      import('./useAttendance').then(({ useAttendance }) => {
-        const attendanceRecords = useAttendance.getState().records;
-        const remainingRecords = attendanceRecords.filter(r => r.subjectId !== id);
-        useAttendance.setState({ records: remainingRecords });
-        saveToStorage('attendance_records', remainingRecords);
-      });
+  deleteSubject: async (id) => {
+    const newSubjects = get().subjects.filter((s) => s.id !== id);
+    set({ subjects: newSubjects });
+    await saveToStorage('subjects', newSubjects);
+    
+    try {
+      const { cancelSubjectNotifications } = await import('../lib/notifications');
+      await cancelSubjectNotifications(id);
+    } catch (err) {
+      console.error('Failed to cancel notifications:', err);
+    }
 
-      return { subjects: newSubjects };
-    });
+    try {
+      const { useAttendance } = await import('./useAttendance');
+      const attendanceRecords = useAttendance.getState().records;
+      const remainingRecords = attendanceRecords.filter(r => r.subjectId !== id);
+      useAttendance.setState({ records: remainingRecords });
+      await saveToStorage('attendance_records', remainingRecords);
+    } catch (err) {
+      console.error('Failed to cleanup attendance records:', err);
+    }
   },
   loadSubjects: async () => {
     const stored = await getFromStorage<Subject[]>('subjects');

@@ -13,8 +13,18 @@ export const countRemainingSessions = (
 ): number => {
   if (!semesterEndDate || !schedule || schedule.length === 0) return 0;
 
-  const endDate = new Date(semesterEndDate);
-  endDate.setHours(23, 59, 59, 999);
+  const parseEndDate = (dateStr: string): Date => {
+    let cleanStr = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
+    const parts = cleanStr.split('-').map(Number);
+    if (parts.length === 3 && !parts.some(isNaN)) {
+      return new Date(parts[0], parts[1] - 1, parts[2], 23, 59, 59, 999);
+    }
+    const d = new Date(dateStr);
+    d.setHours(23, 59, 59, 999);
+    return d;
+  };
+
+  const endDate = parseEndDate(semesterEndDate);
   
   const now = new Date();
   let current = new Date(now);

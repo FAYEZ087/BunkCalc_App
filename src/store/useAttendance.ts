@@ -125,22 +125,32 @@ export const useAttendance = create<AttendanceState>((set, get) => ({
         break; // Past day with no records = missed
       }
 
-      let allPresent = true;
+      let hasAbsent = false;
+      let hasPresent = false;
+      let unmarkedCount = 0;
+
       for (const sub of scheduledSubjects) {
         const rec = dayRecords.find(r => r.subjectId === sub.id);
         if (!rec) {
-          if (daysBack === 0) { allPresent = true; continue; } // Not yet marked today
-          allPresent = false;
+          unmarkedCount++;
+        } else if (rec.status === 'absent') {
+          hasAbsent = true;
           break;
+        } else if (rec.status === 'present') {
+          hasPresent = true;
         }
-        if (rec.status === 'absent') {
-          allPresent = false;
-          break;
-        }
-        // 'present' or 'cancelled' — both are fine for streaks
       }
 
-      if (!allPresent) break;
+      if (hasAbsent) break;
+
+      if (daysBack === 0) {
+        if (hasPresent && unmarkedCount === 0) {
+          streak++;
+        }
+        continue;
+      }
+
+      if (unmarkedCount > 0) break;
       streak++;
     }
 

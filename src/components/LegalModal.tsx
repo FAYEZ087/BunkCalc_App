@@ -21,7 +21,7 @@ const LegalModal: React.FC<Props> = ({ title, type, onClose }) => {
       <div className="flex-1 overflow-y-auto p-6 text-slate-600 dark:text-slate-300 text-sm leading-relaxed space-y-6">
         {type === 'privacy' ? (
           <>
-            <p className="text-slate-500 dark:text-slate-400 text-xs italic">Effective Date: August 5, 2026 &bull; Version 1.1.2</p>
+            <p className="text-slate-500 dark:text-slate-400 text-xs italic">Effective Date: August 15, 2026 &bull; Version 2.0.0</p>
             
             <section>
               <h3 className="text-slate-900 dark:text-white font-bold text-lg mb-2">1. Introduction</h3>
@@ -104,7 +104,7 @@ const LegalModal: React.FC<Props> = ({ title, type, onClose }) => {
           </>
         ) : (
           <>
-            <p className="text-slate-500 dark:text-slate-400 text-xs italic">Effective Date: August 5, 2026 &bull; Version 1.1.2</p>
+            <p className="text-slate-500 dark:text-slate-400 text-xs italic">Effective Date: August 15, 2026 &bull; Version 2.0.0</p>
             
             <section>
               <h3 className="text-slate-900 dark:text-white font-bold text-lg mb-2">1. Acceptance of Terms</h3>
@@ -205,7 +205,7 @@ const LegalModal: React.FC<Props> = ({ title, type, onClose }) => {
           </>
         )}
         <div className="pt-10 pb-10 text-center text-slate-400 dark:text-slate-500 text-[10px]">
-          Last Updated: August 5, 2026 &bull; BunkCalc v1.1.2
+          Last Updated: August 15, 2026 &bull; BunkCalc v2.0.0
         </div>
       </div>
     </div>

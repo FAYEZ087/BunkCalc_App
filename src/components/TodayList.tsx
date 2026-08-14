@@ -10,6 +10,7 @@ import { AppModal } from './AppModal';
 import CelebrationOverlay from './CelebrationOverlay';
 
 import { calculateSubjectStats } from '../lib/calculations';
+import { getFromStorage, saveToStorage } from '../lib/storage';
 
 const TodayList: React.FC = () => {
   const subjects = useSubjects((state) => state.subjects);
@@ -112,18 +113,19 @@ const TodayList: React.FC = () => {
 
     // Show cancelled class explanation if status is cancelled
     if (status === 'cancelled') {
-      const hasSeen = localStorage.getItem('has_seen_cancelled_tooltip');
-      if (!hasSeen) {
-        localStorage.setItem('has_seen_cancelled_tooltip', 'true');
-        setModal({
-          isOpen: true,
-          title: "Cancelled Class Behavior",
-          message: "A cancelled class shrinks your total semester session pool. This slightly reduces your bunk budget — it does not count as a free bunk.",
-          type: "alert",
-          confirmText: "Got It",
-          onConfirm: () => setModal(null)
-        });
-      }
+      getFromStorage<string>('has_seen_cancelled_tooltip').then(hasSeen => {
+        if (!hasSeen) {
+          saveToStorage('has_seen_cancelled_tooltip', 'true');
+          setModal({
+            isOpen: true,
+            title: "Cancelled Class Behavior",
+            message: "A cancelled class shrinks your total semester session pool. This slightly reduces your bunk budget — it does not count as a free bunk.",
+            type: "alert",
+            confirmText: "Got It",
+            onConfirm: () => setModal(null)
+          });
+        }
+      });
     }
   }, [settings.hapticsEnabled, markAttendance, dateStr, subjects]);
 
@@ -143,9 +145,6 @@ const TodayList: React.FC = () => {
 
   // Swipe handlers
   const onPointerDown = (e: React.PointerEvent, subjectId: string) => {
-    // Prevent swiping if subject is already marked today
-    if (getStatusForToday(subjectId)) return;
-
     const currentOffset = snappedLeft[subjectId] ? -200 : 0;
     pointerStart.current = { x: e.clientX - currentOffset, y: e.clientY, id: subjectId };
     isSwipingRef.current = false;

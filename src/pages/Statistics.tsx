@@ -2,11 +2,13 @@ import React, { useState, useMemo } from 'react';
 import { useSubjects } from '../store/useSubjects';
 import { useAttendance } from '../store/useAttendance';
 import { useSettings } from '../store/useSettings';
-import { calculateSubjectStats, getStatusBgColor } from '../lib/calculations';
+import { calculateSubjectStats, getStatusBgColor, parseLocalDate } from '../lib/calculations';
 import ShareCard from '../components/ShareCard';
 import EmptyState from '../components/EmptyState';
 import { shareAttendanceCard } from '../lib/shareCard';
 import { AppModal } from '../components/AppModal';
+import WeeklyChart from '../components/WeeklyChart';
+import WhatIfSimulator from '../components/WhatIfSimulator';
 
 interface Props {
   onOpenHistory: () => void;
@@ -20,11 +22,13 @@ const Statistics: React.FC<Props> = ({ onOpenHistory }) => {
   const [isSharing, setIsSharing] = useState(false);
   const [modal, setModal] = useState<{ isOpen: boolean; title: string; message: string; type?: 'error' } | null>(null);
 
-  const { totalAttended, totalPossible, overallPct, overallPeakPct } = useMemo(() => {
+  const { totalAttended, totalPossible, overallPct, overallPeakPct, totalSafeBunks } = useMemo(() => {
     let tAttended = 0;
     let tPossible = 0;
     let totalMaxAttended = 0;
     let totalPotentialTotal = 0;
+
+    let totalSafeBunks = 0;
 
     subjects.forEach((s) => {
       const stats = calculateSubjectStats(s, records, settings.semesterEndDate, settings.holidays);
@@ -32,6 +36,7 @@ const Statistics: React.FC<Props> = ({ onOpenHistory }) => {
       tPossible += stats.totalClasses;
       totalMaxAttended += stats.maxAttended;
       totalPotentialTotal += stats.potentialTotal;
+      totalSafeBunks += Math.max(0, stats.bunkBudget);
     });
 
     const oPct = tPossible === 0 ? 100 : (tAttended / tPossible) * 100;
@@ -41,7 +46,8 @@ const Statistics: React.FC<Props> = ({ onOpenHistory }) => {
       totalAttended: tAttended,
       totalPossible: tPossible,
       overallPct: oPct,
-      overallPeakPct: oPeakPct
+      overallPeakPct: oPeakPct,
+      totalSafeBunks,
     };
   }, [subjects, records, settings.semesterEndDate, settings.holidays]);
 
@@ -123,6 +129,8 @@ const Statistics: React.FC<Props> = ({ onOpenHistory }) => {
         <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16 blur-3xl"></div>
       </div>
 
+      <WeeklyChart records={records} threshold={settings.globalThreshold} />
+
       <section className="mb-8">
         <h2 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-4">Projections</h2>
         <div className="bg-slate-50 dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 space-y-6">
@@ -134,7 +142,7 @@ const Statistics: React.FC<Props> = ({ onOpenHistory }) => {
             <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
               Based on your {subjects.length} subjects, you can skip a total of 
               <span className="text-slate-900 dark:text-white font-bold px-1">
-                {subjects.reduce((acc, s) => acc + Math.max(0, calculateSubjectStats(s, records, settings.semesterEndDate, settings.holidays).bunkBudget), 0)}
+                {totalSafeBunks}
               </span> 
               classes right now while staying above {Math.round(settings.globalThreshold * 100)}%.
             </p>
@@ -143,12 +151,14 @@ const Statistics: React.FC<Props> = ({ onOpenHistory }) => {
           <div className="pt-4 border-t border-slate-200 dark:border-slate-800">
             <p className="text-sm font-bold mb-2">'Perfect Attendance' Goal</p>
             <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-              If you attend every single class from today until {new Date(settings.semesterEndDate).toLocaleDateString()}, 
+              If you attend every single class from today until {parseLocalDate(settings.semesterEndDate).toLocaleDateString()}, 
               your attendance will peak at <span className="text-blue-500 dark:text-blue-400 font-bold italic">~{overallPeakPct.toFixed(1)}%</span>.
             </p>
           </div>
         </div>
       </section>
+
+      <WhatIfSimulator />
 
       <section>
         <h2 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-4">Subject breakdown</h2>

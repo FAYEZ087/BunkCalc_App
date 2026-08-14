@@ -3,6 +3,8 @@ import { validateImportPayload } from './validation';
 import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
+import { calculateSubjectStats } from './calculations';
+import type { Subject, AttendanceRecord } from './types';
 
 const STORAGE_VERSION = 3;
 
@@ -140,3 +142,113 @@ export const importAppState = async (file: File): Promise<any> => {
     reader.readAsText(file);
   });
 };
+
+export const exportToCSV = async () => {
+  const subjects = (await getFromStorage<Subject[]>('subjects')) || [];
+  const attendance = (await getFromStorage<AttendanceRecord[]>('attendance_records')) || [];
+  
+  const header = 'Date,Subject,Status,Credits';
+  const rows = [...attendance].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(record => {
+    const subject = subjects.find(s => s.id === record.subjectId);
+    const subjectName = subject ? subject.name : 'Unknown';
+    const credits = subject ? subject.credits : 0;
+    return `${record.date},${subjectName},${record.status},${credits}`;
+  });
+  
+  const csvContent = [header, ...rows].join('\n');
+  const fileName = `bunkcalc_attendance_${new Date().toLocaleDateString('en-CA')}.csv`;
+  
+  if (Capacitor.isNativePlatform()) {
+    try {
+      const base64Data = btoa(unescape(encodeURIComponent(csvContent)));
+      
+      const savedFile = await Filesystem.writeFile({
+        path: fileName,
+        data: base64Data,
+        directory: Directory.Cache,
+      });
+
+      await Share.share({
+        title: 'BunkCalc CSV Report',
+        text: 'My BunkCalc Attendance Report.',
+        files: [savedFile.uri],
+        dialogTitle: 'Save BunkCalc CSV',
+      });
+      return;
+    } catch (err) {
+      console.error('Native app CSV share failed, falling back to web download:', err);
+    }
+  }
+
+  const blob = new Blob([csvContent], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+};
+
+export const exportToPDF = async () => {
+  const subjects = (await getFromStorage<Subject[]>('subjects')) || [];
+  const attendance = (await getFromStorage<AttendanceRecord[]>('attendance_records')) || [];
+  
+  let html = `
+    <html>
+      <head>
+        <title>BunkCalc Attendance Report</title>
+        <style>
+          body { font-family: sans-serif; padding: 20px; color: #333; }
+          h1 { text-align: center; }
+          .date { text-align: center; color: #666; margin-bottom: 20px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+          th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+          th { background-color: #f8f9fa; }
+        </style>
+      </head>
+      <body>
+        <h1>BunkCalc Attendance Report</h1>
+        <div class="date">Generated on ${new Date().toLocaleDateString()}</div>
+        <table>
+          <thead>
+            <tr>
+              <th>Subject</th>
+              <th>Attended / Total</th>
+              <th>Percentage</th>
+              <th>Bunk Budget</th>
+            </tr>
+          </thead>
+          <tbody>
+  `;
+  
+  subjects.forEach(subject => {
+    const stats = calculateSubjectStats(subject, attendance);
+    html += `
+      <tr>
+        <td>${subject.name}</td>
+        <td>${stats.attendedCount} / ${stats.totalClasses}</td>
+        <td>${stats.attendancePct.toFixed(1)}%</td>
+        <td>${stats.safeBunks > 0 ? stats.safeBunks : 0}</td>
+      </tr>
+    `;
+  });
+  
+  html += `
+          </tbody>
+        </table>
+      </body>
+    </html>
+  `;
+  
+  const printWindow = window.open('', '_blank');
+  if (printWindow) {
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
+  }
+};
+

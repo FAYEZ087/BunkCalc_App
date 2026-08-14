@@ -1,8 +1,9 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import type { Subject } from '../lib/types';
 import { calculateProjections, getStatusBgColor, parseLocalDate } from '../lib/calculations';
 import { useAttendance } from '../store/useAttendance';
 import { useSettings } from '../store/useSettings';
+import { AppModal } from '../components/AppModal';
 
 interface Props {
   subject: Subject;
@@ -12,6 +13,16 @@ interface Props {
 const SubjectDetail: React.FC<Props> = ({ subject, onBack }) => {
   const { records, unmarkAttendance, markAttendance } = useAttendance();
   const { settings } = useSettings();
+  
+  const [modal, setModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    type?: 'error' | 'alert' | 'success' | 'confirm';
+    confirmText?: string;
+    cancelText?: string;
+    onConfirm: () => void;
+  } | null>(null);
   
   const subjectRecords = records
     .filter((r) => r.subjectId === subject.id)
@@ -109,7 +120,18 @@ const SubjectDetail: React.FC<Props> = ({ subject, onBack }) => {
                   )}
                 </div>
                 <button 
-                  onClick={() => unmarkAttendance(record.id)}
+                  onClick={() => setModal({
+                    isOpen: true,
+                    title: "Delete Record",
+                    message: `Delete attendance record for ${parseLocalDate(record.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', weekday: 'short' })}? This cannot be undone.`,
+                    type: "confirm",
+                    confirmText: "Delete",
+                    cancelText: "Cancel",
+                    onConfirm: () => {
+                      unmarkAttendance(record.id);
+                      setModal(null);
+                    }
+                  })}
                   className="text-slate-400 dark:text-slate-600 p-2 hover:text-red-500 transition-colors"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -121,6 +143,19 @@ const SubjectDetail: React.FC<Props> = ({ subject, onBack }) => {
           )}
         </div>
       </section>
+
+      {modal && (
+        <AppModal
+          isOpen={modal.isOpen}
+          title={modal.title}
+          message={modal.message}
+          type={modal.type}
+          confirmText={modal.confirmText}
+          cancelText={modal.cancelText}
+          onConfirm={modal.onConfirm}
+          onCancel={() => setModal(null)}
+        />
+      )}
     </div>
   );
 };

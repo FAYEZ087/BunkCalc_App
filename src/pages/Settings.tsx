@@ -2,7 +2,7 @@ import React, { useState, Suspense, lazy } from 'react';
 import { useSettings } from '../store/useSettings';
 import { useSubjects } from '../store/useSubjects';
 import { useAttendance } from '../store/useAttendance';
-import { exportAppState, importAppState, clearAllStorage, saveToStorage } from '../lib/storage';
+import { exportAppState, importAppState, clearAllStorage, saveToStorage, exportToCSV, exportToPDF } from '../lib/storage';
 import HelpTooltip from '../components/HelpTooltip';
 import ThemedIcon from '../components/ThemedIcon';
 import SkeletonLoader from '../components/SkeletonLoader';
@@ -26,6 +26,7 @@ const Settings: React.FC = () => {
   const [showArchiveModal, setShowArchiveModal] = useState(false);
   const [archiveName, setArchiveName] = useState('');
   const [showArchivedList, setShowArchivedList] = useState(false);
+  const [showWhatsNew, setShowWhatsNew] = useState(false);
 
   // Holiday Manager State
   const [holidayName, setHolidayName] = useState('');
@@ -113,6 +114,7 @@ const Settings: React.FC = () => {
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    const inputElement = e.target;
     if (file) {
       setModal({
         isOpen: true,
@@ -125,6 +127,7 @@ const Settings: React.FC = () => {
           setModal(null);
           try {
             await importAppState(file);
+            inputElement.value = '';
             setModal({
               isOpen: true,
               title: "Data Restored",
@@ -234,6 +237,117 @@ const Settings: React.FC = () => {
         <h1 className="text-2xl font-bold">Settings</h1>
       </header>
 
+      {/* What's New in v2.0.0 Collapsible Menu */}
+      <section className="mb-8">
+        <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 rounded-3xl p-5 text-white shadow-xl relative overflow-hidden transition-all duration-300">
+          <button 
+            onClick={() => setShowWhatsNew(!showWhatsNew)}
+            className="w-full flex items-center justify-between text-left group cursor-pointer"
+          >
+            <div className="flex items-center gap-3">
+              <div className="bg-white/20 p-2.5 rounded-2xl flex items-center justify-center">
+                <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                </svg>
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="bg-white/20 text-white text-[9px] font-black uppercase px-2 py-0.5 rounded-full tracking-widest">
+                    v2.0.0 Release
+                  </span>
+                </div>
+                <h2 className="text-base font-black text-white mt-0.5">What's New Summary</h2>
+              </div>
+            </div>
+            <div className="bg-white/10 group-hover:bg-white/20 p-2 rounded-xl transition-all">
+              <svg className={`w-4 h-4 text-white transition-transform duration-300 ${showWhatsNew ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+              </svg>
+            </div>
+          </button>
+
+          {showWhatsNew && (
+            <div className="mt-4 pt-4 border-t border-white/15 space-y-3 text-xs animate-in fade-in duration-200">
+              <p className="text-[11px] text-blue-100 mb-3 leading-relaxed">
+                7 major features & 15+ stability fixes added to BunkCalc:
+              </p>
+
+              <div className="space-y-3 bg-black/20 rounded-2xl p-4 backdrop-blur-sm border border-white/10">
+                <div className="flex items-start gap-3">
+                  <div className="p-1.5 rounded-lg bg-blue-500/30 text-white shrink-0 mt-0.5">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+                  </div>
+                  <div>
+                    <p className="font-bold text-white">Weekly Attendance Trends</p>
+                    <p className="text-[11px] text-blue-100">8-week visual bar chart on the Statistics page.</p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3">
+                  <div className="p-1.5 rounded-lg bg-purple-500/30 text-white shrink-0 mt-0.5">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                  </div>
+                  <div>
+                    <p className="font-bold text-white">"What-If" Bunk Simulator</p>
+                    <p className="text-[11px] text-blue-100">Predict your exact percentage before skipping upcoming classes.</p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3">
+                  <div className="p-1.5 rounded-lg bg-indigo-500/30 text-white shrink-0 mt-0.5">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                  </div>
+                  <div>
+                    <p className="font-bold text-white">Semester Progress Bar</p>
+                    <p className="text-[11px] text-blue-100">Real-time timeline tracking weeks remaining on your dashboard.</p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3">
+                  <div className="p-1.5 rounded-lg bg-emerald-500/30 text-white shrink-0 mt-0.5">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                  </div>
+                  <div>
+                    <p className="font-bold text-white">Swipe-to-Undo & Re-mark</p>
+                    <p className="text-[11px] text-blue-100">Re-swipe marked subject cards anytime to update status.</p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3">
+                  <div className="p-1.5 rounded-lg bg-green-500/30 text-white shrink-0 mt-0.5">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                  </div>
+                  <div>
+                    <p className="font-bold text-white">CSV & PDF Exports</p>
+                    <p className="text-[11px] text-blue-100">Download attendance records as CSV spreadsheets or printable PDFs.</p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3">
+                  <div className="p-1.5 rounded-lg bg-cyan-500/30 text-white shrink-0 mt-0.5">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
+                  </div>
+                  <div>
+                    <p className="font-bold text-white">History Search & Filters</p>
+                    <p className="text-[11px] text-blue-100">Filter your logs by subject, status, or date range in Global History.</p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3">
+                  <div className="p-1.5 rounded-lg bg-teal-500/30 text-white shrink-0 mt-0.5">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
+                  </div>
+                  <div>
+                    <p className="font-bold text-white">Safety & Performance Overhaul</p>
+                    <p className="text-[11px] text-blue-100">Delete confirmations, accurate timezone dates, and instant page loads.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </section>
+
       <section className="mb-8">
         <h2 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-4">Academic</h2>
         <div className="bg-slate-50 dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
@@ -293,7 +407,7 @@ const Settings: React.FC = () => {
             <input 
               type="date" 
               value={settings.semesterEndDate.split('T')[0]}
-              onChange={(e) => setSettings({ ...settings, semesterEndDate: new Date(e.target.value).toISOString() })}
+              onChange={(e) => e.target.value && setSettings({ ...settings, semesterEndDate: e.target.value })}
               className="w-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-sm font-bold outline-none focus:border-blue-500 text-slate-900 dark:text-white"
             />
           </div>
@@ -597,6 +711,28 @@ const Settings: React.FC = () => {
           </button>
         </div>
 
+        <div className="grid grid-cols-2 gap-4 mt-4">
+          <button 
+            onClick={exportToCSV}
+            className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-2xl flex flex-col items-center gap-2 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <span className="text-xs font-bold text-slate-900 dark:text-white">Export CSV</span>
+          </button>
+          
+          <button 
+            onClick={exportToPDF}
+            className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-2xl flex flex-col items-center gap-2 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <span className="text-xs font-bold text-slate-900 dark:text-white">Export PDF</span>
+          </button>
+        </div>
+
         {/* Archive Semester Button */}
         <button
           onClick={() => setShowArchiveModal(true)}
@@ -785,7 +921,7 @@ const Settings: React.FC = () => {
           </button>
           <div className="p-4 flex justify-between items-center">
             <span className="font-bold text-slate-500 dark:text-slate-400">App Version</span>
-            <span className="text-slate-500 dark:text-slate-400 font-black tracking-widest uppercase text-xs">v1.1.2</span>
+            <span className="text-slate-500 dark:text-slate-400 font-black tracking-widest uppercase text-xs">v2.0.0</span>
           </div>
         </div>
       </section>
@@ -800,12 +936,19 @@ const Settings: React.FC = () => {
         </Suspense>
       )}
 
-      <div className="mt-auto pt-8">
-        <p className="text-center text-slate-400 dark:text-slate-600 text-[10px] font-bold uppercase tracking-widest mb-1">
+      {/* Unified Footer */}
+      <footer className="mt-12 pt-8 pb-4 border-t border-slate-200/50 dark:border-slate-800/50 text-center space-y-2">
+        <div className="inline-flex items-center gap-2 bg-blue-500/10 dark:bg-blue-500/15 border border-blue-500/20 px-3 py-1 rounded-full">
+          <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
+          <span className="text-[11px] font-black uppercase tracking-widest text-blue-600 dark:text-blue-400">BunkCalc v2.0.0</span>
+        </div>
+        <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
           Made with ❤️ by <a href="https://github.com/FAYEZ087" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">FAYEZ087</a> for KIITians
         </p>
-        <p className="text-center text-slate-300 dark:text-slate-800 text-[8px] font-black uppercase">© 2026 BunkCalc. All Rights Reserved.</p>
-      </div>
+        <p className="text-[9px] font-bold text-slate-400 dark:text-slate-600 uppercase tracking-widest">
+          © 2026 BunkCalc &bull; Smart Attendance & Bunk Budgeting Engine
+        </p>
+      </footer>
 
       {/* Archive Semester Modal */}
       {showArchiveModal && (

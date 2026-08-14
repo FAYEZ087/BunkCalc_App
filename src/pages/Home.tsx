@@ -1,4 +1,4 @@
-import React, { useState, Suspense, lazy } from 'react';
+import React, { useState, useMemo, Suspense, lazy } from 'react';
 import { useSubjects } from '../store/useSubjects';
 import { useAttendance } from '../store/useAttendance';
 import { useSettings } from '../store/useSettings';
@@ -10,6 +10,8 @@ import HelpTooltip from '../components/HelpTooltip';
 import SkeletonLoader from '../components/SkeletonLoader';
 import { calculateSubjectStats } from '../lib/calculations';
 import type { Subject } from '../lib/types';
+import SemesterProgress from '../components/SemesterProgress';
+import { UpdateBanner } from '../components/UpdateBanner';
 
 // Lazy loaded heavy components
 const TimetableGrid = lazy(() => import('../components/TimetableGrid'));
@@ -74,10 +76,10 @@ const Home: React.FC<Props> = ({ onSelectSubject, onOpenCalendar }) => {
     };
   }, [subjects, records, settings.semesterEndDate, settings.holidays]);
 
-  const getLiveAndNextClass = (): {
+  const { liveClass, nextClass } = useMemo<{
     liveClass: { subject: Subject; time: string; endMins: number } | null;
     nextClass: { subject: Subject; time: string; startMins: number } | null;
-  } => {
+  }>(() => {
     if (subjects.length === 0) return { liveClass: null, nextClass: null };
 
     const today = now.getDay();
@@ -109,9 +111,7 @@ const Home: React.FC<Props> = ({ onSelectSubject, onOpenCalendar }) => {
       liveClass: live,
       nextClass: upcoming[0] || null,
     };
-  };
-
-  const { liveClass, nextClass } = getLiveAndNextClass();
+  }, [subjects, now]);
 
   const handleSaveSubject = (subject: Subject) => {
     if (modalMode === 'add') {
@@ -136,16 +136,19 @@ const Home: React.FC<Props> = ({ onSelectSubject, onOpenCalendar }) => {
 
   return (
     <div className="min-h-screen bg-white dark:bg-slate-950 text-slate-900 dark:text-white p-4 pb-24">
+      <div className="-mx-4 -mt-4 mb-4">
+        <UpdateBanner />
+      </div>
       <header className="mb-6 flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-blue-500 italic uppercase">BunkCalc</h1>
-          <p className="text-slate-500 dark:text-slate-400 text-xs font-bold tracking-widest flex items-center gap-1">
+          <div className="text-slate-500 dark:text-slate-400 text-xs font-bold tracking-widest flex items-center gap-1">
             DASHBOARD
             <HelpTooltip
               title="Dashboard Overview"
               content="Track your overall attendance health, live class schedule, and safe bunk pool calculated for the semester."
             />
-          </p>
+          </div>
         </div>
         <div className="flex gap-2 items-center">
           {streak >= 2 && (
@@ -199,6 +202,10 @@ const Home: React.FC<Props> = ({ onSelectSubject, onOpenCalendar }) => {
 
       {viewMode === 'dashboard' ? (
         <>
+          {subjects.length > 0 && (
+            <SemesterProgress semesterEndDate={settings.semesterEndDate} records={records} />
+          )}
+
           {/* Animated Bunk Meter Component */}
           {subjects.length > 0 && (
             <div className="mb-6">

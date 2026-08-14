@@ -231,10 +231,9 @@ const CalendarView: React.FC<Props> = ({ onBack }) => {
                       <div className="flex gap-2">
                         {status !== 'cancelled' && (
                           <button
-                            onClick={() => {
+                            onClick={async () => {
                               if (record) {
-                                unmarkAttendance(record.id);
-                                markAttendance({
+                                await markAttendance({
                                   ...record,
                                   status: status === 'present' ? 'absent' : 'present'
                                 });

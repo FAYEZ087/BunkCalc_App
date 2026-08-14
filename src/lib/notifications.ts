@@ -16,10 +16,12 @@ const getSubjectHash = (id: string) => {
   }, 0)) % 1000;
 };
 
-/**
- * 1. Upcoming Classes Reminders & Post-Class Marking Reminders
- * Schedules individual notifications for each class today.
- */
+// Generate deterministic collision-free 32-bit positive integer IDs
+const getReminderId = (base: number, dayOffset: number, subjectId: string, slotIndex: number) => {
+  const subHash = getSubjectHash(subjectId);
+  return base + (dayOffset * 10000) + (subHash * 10) + (slotIndex % 10);
+};
+
 /**
  * 1. Upcoming Classes Reminders & Post-Class Marking Reminders
  * Schedules individual notifications for each class today.
@@ -34,7 +36,7 @@ export const scheduleDailyClassReminders = async (
   // Always clear previous pending daily and post-class reminders to prevent duplication
   const pending = await LocalNotifications.getPending();
   const dailyIds = pending.notifications
-    .filter(n => n.id >= NOTIF_ID_DAILY_BASE && n.id < NOTIF_ID_THRESHOLD_BASE)
+    .filter(n => (n.id >= NOTIF_ID_DAILY_BASE && n.id < NOTIF_ID_THRESHOLD_BASE))
     .map(n => ({ id: n.id }));
   
   if (dailyIds.length > 0) {
@@ -45,7 +47,7 @@ export const scheduleDailyClassReminders = async (
     return;
   }
 
-  const notifications = [];
+  const notifications: any[] = [];
   const now = new Date();
 
   // Schedule reminders for the next 7 days (including today and the next 6 days)
@@ -58,7 +60,7 @@ export const scheduleDailyClassReminders = async (
       const todaySlots = subject.schedule.filter(slot => Number(slot.day) === targetDay);
       const isAlreadyMarked = records.some(r => r.subjectId === subject.id && r.date === targetDateStr);
       
-      for (const slot of todaySlots) {
+      todaySlots.forEach((slot, index) => {
         const [hours, minutes] = slot.slot.split(':').map(Number);
         const classDate = new Date(targetDate);
         classDate.setHours(hours, minutes, 0, 0);
@@ -71,7 +73,7 @@ export const scheduleDailyClassReminders = async (
             notifications.push({
               title: 'Upcoming Class',
               body: `${subject.name} starts in ${settings.reminderMinutesBefore} minutes.`,
-              id: NOTIF_ID_DAILY_BASE + (dayOffset * 70) + (getSubjectHash(subject.id) % 35) + (hours % 24),
+              id: getReminderId(NOTIF_ID_DAILY_BASE, dayOffset, subject.id, index),
               schedule: { at: triggerDate },
               extra: { subjectId: subject.id },
               smallIcon: 'ic_launcher',
@@ -87,7 +89,7 @@ export const scheduleDailyClassReminders = async (
             notifications.push({
               title: 'Mark Attendance',
               body: `Did you attend today's ${subject.name} class? Mark your attendance now!`,
-              id: NOTIF_ID_POST_CLASS_BASE + (dayOffset * 70) + (getSubjectHash(subject.id) % 35) + (hours % 24),
+              id: getReminderId(NOTIF_ID_POST_CLASS_BASE, dayOffset, subject.id, index),
               schedule: { at: postClassDate },
               extra: { subjectId: subject.id },
               smallIcon: 'ic_launcher',
@@ -95,7 +97,7 @@ export const scheduleDailyClassReminders = async (
             });
           }
         }
-      }
+      });
     }
   }
 

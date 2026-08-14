@@ -11,6 +11,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import type { TabType } from './components/BottomNav';
 import type { Subject } from './lib/types';
 import { scheduleDailyClassReminders } from './lib/notifications';
+import { useUpdateStore } from './store/useUpdateStore';
 
 // Lazy loaded views
 const Setup = lazy(() => import('./pages/Setup'));
@@ -95,6 +96,9 @@ function App() {
       if (currentSubjects.length === 0) {
         setShowOnboarding(true);
       }
+
+      // Silent version update check
+      useUpdateStore.getState().checkForUpdates();
 
       setDataReady(true);
     };

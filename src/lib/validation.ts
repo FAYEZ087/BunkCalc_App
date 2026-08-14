@@ -182,6 +182,8 @@ function validateSettings(set: any): { valid: boolean; data?: any } {
 
   if (set.semesterEndDate !== undefined) {
     if (!isString(set.semesterEndDate)) return { valid: false };
+    const datePart = set.semesterEndDate.split('T')[0];
+    if (!DATE_REGEX.test(datePart)) return { valid: false };
     result.semesterEndDate = set.semesterEndDate;
   }
 

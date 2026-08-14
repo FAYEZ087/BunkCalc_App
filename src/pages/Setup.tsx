@@ -135,7 +135,7 @@ const Setup: React.FC = () => {
               <input 
                 type="date" 
                 value={settings.semesterEndDate.split('T')[0]}
-                onChange={(e) => setSettings({ ...settings, semesterEndDate: new Date(e.target.value).toISOString() })}
+                onChange={(e) => e.target.value && setSettings({ ...settings, semesterEndDate: e.target.value })}
                 className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4 outline-none focus:border-blue-500 text-slate-900 dark:text-white font-bold"
               />
             </div>
