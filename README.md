@@ -4,14 +4,14 @@
 
 ### _Take Control of Your College Life._
 
-[![Version](https://img.shields.io/badge/version-2.0.0-blue?style=for-the-badge)](https://github.com/bunkcalc)
-[![Platform](https://img.shields.io/badge/platform-Android-3ddc84?style=for-the-badge&logo=android&logoColor=white)](https://github.com/bunkcalc)
-[![License](https://img.shields.io/badge/license-Private-red?style=for-the-badge)](https://github.com/bunkcalc)
+[![Version](https://img.shields.io/badge/version-2.1.0-blue?style=for-the-badge)](https://github.com/PinecoXZ/BunkCalc_App)
+[![Platform](https://img.shields.io/badge/platform-Android-3ddc84?style=for-the-badge&logo=android&logoColor=white)](https://github.com/PinecoXZ/BunkCalc_App)
+[![License](https://img.shields.io/badge/license-Private-red?style=for-the-badge)](https://github.com/PinecoXZ/BunkCalc_App)
 [![React](https://img.shields.io/badge/React-19-61dafb?style=for-the-badge&logo=react&logoColor=white)](https://react.dev)
 [![Capacitor](https://img.shields.io/badge/Capacitor-8-119eff?style=for-the-badge&logo=capacitor&logoColor=white)](https://capacitorjs.com)
 
 The **ultimate proactive attendance tracker** built for university students.  
-Smart math. Bunk simulator. Trend analytics. CSV/PDF exports. Zero data collection.
+Class timetable QR sharing. Mid-semester past attendance sync. Bunk strategy engine. Zero data collection.
 
 ---
 
@@ -21,6 +21,10 @@ Smart math. Bunk simulator. Trend analytics. CSV/PDF exports. Zero data collecti
 
 | Feature | Description |
 |---|---|
+| ⚡ **Timetable Cloud & QR Sharing** | Share and import full section timetables in 1 second with 6-letter short codes or camera QR scanning |
+| 📥 **Mid-Semester Past Attendance** | Enter past attended and missed class numbers during timetable import or edit them anytime in Subject Details |
+| ✏️ **Interactive Holiday Manager** | Add and manage semester breaks directly with automated reminder rescheduling and calendar sync |
+| 🎯 **Weekly Bunk Strategy** | Smart 7-day tactical roadmap showing safe skips and exact consecutive classes needed for recovery |
 | 📊 **Weekly Attendance Trends** | 8-week visual bar chart tracking your weekly attendance percentage against your threshold |
 | 🔮 **"What-If" Bunk Simulator** | Predict your exact percentage before skipping upcoming classes with instant recovery estimates |
 | ⏳ **Semester Progress Bar** | Real-time timeline bar tracking weeks remaining in the semester and elapsed class days |
@@ -28,7 +32,7 @@ Smart math. Bunk simulator. Trend analytics. CSV/PDF exports. Zero data collecti
 | 📂 **CSV & PDF Exports** | Download your complete attendance records as CSV spreadsheets or export formatted PDF reports |
 | 🔍 **History Search & Filters** | Filter attendance logs by subject, status (Present/Absent/Cancelled), or custom date range |
 | 🛡️ **Delete Safety Confirmations** | Built-in confirmation dialogs prevent accidental deletion of attendance records or subject profiles |
-| 🔔 **Smart Local Notifications** | Pre-class reminders and post-class attendance prompts, all scheduled collision-free locally on-device |
+| 🔔 **Smart Local Notifications** | Post-class attendance prompts with 10-minute delayed dispatch and automated duplicate suppression |
 | 📅 **Today View** | See your daily schedule at a glance with interactive swipe-marking |
 | 📈 **Statistics Dashboard** | Rich analytics with per-subject and overall attendance percentages |
 | 🗂️ **Semester Archives** | Automatically archive past semesters and browse your academic history |
@@ -215,6 +219,6 @@ This project is **private** and not open-source. All rights reserved.
 
 **Built with ❤️ for students who know when to show up — and when not to.**
 
-`v2.0.0` · `com.bunkcalc.app`
+`v2.1.0` · `com.bunkcalc.app` · Developed by [PinecoXZ](https://github.com/PinecoXZ)
 
 </div>
