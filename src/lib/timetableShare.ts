@@ -25,12 +25,55 @@ export const encodeCompactPayload = (subjects: Subject[], sectionName?: string):
 };
 
 /**
- * Generates an ultra-short (6 to 10 letter) share code via CORS-compliant cloud storage
+ * Generates an ultra-short (under 7 to 10 character) share code via CORS-compliant cloud storage
  */
 export const createShortCloudCode = async (subjects: Subject[], sectionName?: string): Promise<string> => {
   const payload = encodeCompactPayload(subjects, sectionName);
 
-  // 1. Try RESTful Object KV API (100% CORS-friendly, instant)
+  // 1. Primary: paste.rs (Generates 5-char slug e.g. "jBma7" -> Code is "BK-jBma7" (8 chars))
+  try {
+    const response = await fetch('https://paste.rs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: payload,
+    });
+
+    if (response.ok) {
+      const url = (await response.text()).trim();
+      const slug = url.split('/').filter(Boolean).pop();
+      if (slug && slug.length >= 3 && slug.length <= 8) {
+        return `BK-${slug}`;
+      }
+    }
+  } catch (err) {
+    console.warn('paste.rs shortener failed, trying dpaste fallback...', err);
+  }
+
+  // 2. Fallback: dpaste.com (Generates 6-8 char slug)
+  try {
+    const response = await fetch('https://dpaste.com/api/v2/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        content: payload,
+        format: 'url',
+        expiry_days: '180',
+        title: sectionName || 'BunkCalc Timetable',
+      }),
+    });
+
+    if (response.ok) {
+      const text = (await response.text()).trim();
+      const slug = text.split('/').filter(Boolean).pop();
+      if (slug) {
+        return `BK-${slug.slice(0, 6)}`;
+      }
+    }
+  } catch (err) {
+    console.warn('dpaste fallback failed:', err);
+  }
+
+  // 3. Fallback: RESTful Object KV API (take first 6 chars of ID)
   try {
     const response = await fetch('https://api.restful-api.dev/objects', {
       method: 'POST',
@@ -39,7 +82,7 @@ export const createShortCloudCode = async (subjects: Subject[], sectionName?: st
         'Accept': 'application/json',
       },
       body: JSON.stringify({
-        name: `BUNK_${(sectionName || 'TT').slice(0, 10)}`,
+        name: `BUNK_${(sectionName || 'TT').slice(0, 6)}`,
         data: { p: payload },
       }),
     });
@@ -47,40 +90,15 @@ export const createShortCloudCode = async (subjects: Subject[], sectionName?: st
     if (response.ok) {
       const result = await response.json();
       if (result && result.id) {
-        // Result ID is like "ff808181932...", take first 8 chars or full
-        const slug = String(result.id).trim();
+        const slug = String(result.id).trim().slice(0, 6);
         return `BK-${slug}`;
       }
     }
   } catch (err) {
-    console.warn('REST API shortener failed, trying dpaste fallback...', err);
+    console.warn('REST API fallback failed:', err);
   }
 
-  // 2. Try dpaste.org (generates 4-6 char slug)
-  try {
-    const response = await fetch('https://dpaste.org/api/', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        content: payload,
-        format: 'json',
-        expiry_days: '90',
-        title: sectionName || 'BunkCalc Timetable',
-      }),
-    });
-
-    if (response.ok) {
-      const data = await response.json();
-      if (data && data.url) {
-        const slug = data.url.split('/').filter(Boolean).pop();
-        if (slug) return `BK-${slug}`;
-      }
-    }
-  } catch (err) {
-    console.warn('dpaste fallback failed:', err);
-  }
-
-  // 3. Fallback: Compact delimited code (guaranteed 100% offline)
+  // 4. Fallback: Compact delimited code
   return `BK:${payload}`;
 };
 
@@ -96,8 +114,8 @@ export const buildTimetableQRWebUrl = (codeOrPayload: string): string => {
 
 /**
  * Decodes timetable data from either:
- * - A Web URL (e.g. "https://bunk-calc-web.vercel.app/?import=BK-A8F3")
- * - A short code (e.g. "BK-ff808181...", "BK-A8F3", "A8F3")
+ * - A Web URL (e.g. "https://bunk-calc-web.vercel.app/?import=BK-jBma7")
+ * - A short code (e.g. "BK-jBma7", "jBma7", "BK-H4ZGA")
  * - A full compact string ("BK:...")
  * - A legacy base64 string ("BUNKTT:...")
  */
@@ -116,36 +134,64 @@ export const decodeTimetable = async (input: string): Promise<{ sectionName: str
     }
   }
 
-  // If user entered a short code like "BK-..." or alphanumeric code without "|"
+  // If user entered a short code like "BK-jBma7", "jBma7", etc.
   if (!raw.includes('|') && !raw.includes('~')) {
-    let cleanCode = raw;
-    if (cleanCode.startsWith('BK-')) {
-      cleanCode = cleanCode.slice(3).trim();
-    } else if (cleanCode.startsWith('BK:')) {
+    let cleanCode = raw.trim();
+    if (cleanCode.toLowerCase().startsWith('bk-') || cleanCode.toLowerCase().startsWith('bk:')) {
       cleanCode = cleanCode.slice(3).trim();
     }
 
-    // 1. Try resolving via RESTful Object API
+    // 1. Try paste.rs
     try {
-      const response = await fetch(`https://api.restful-api.dev/objects/${cleanCode}`);
+      const response = await fetch(`https://paste.rs/${cleanCode}`);
       if (response.ok) {
-        const obj = await response.json();
-        if (obj && obj.data && obj.data.p && obj.data.p.includes('|')) {
-          raw = obj.data.p;
+        const text = await response.text();
+        if (text && (text.includes('|') || text.includes('~'))) {
+          raw = text.trim();
         }
       }
     } catch {
       // continue
     }
 
-    // 2. Try resolving via dpaste.org
-    if (!raw.includes('|')) {
+    // 2. Try dpaste.com
+    if (!raw.includes('|') && !raw.includes('~')) {
+      try {
+        const response = await fetch(`https://dpaste.com/${cleanCode}.txt`);
+        if (response.ok) {
+          const text = await response.text();
+          if (text && (text.includes('|') || text.includes('~'))) {
+            raw = text.trim();
+          }
+        }
+      } catch {
+        // continue
+      }
+    }
+
+    // 3. Try dpaste.org
+    if (!raw.includes('|') && !raw.includes('~')) {
       try {
         const response = await fetch(`https://dpaste.org/${cleanCode}/raw`);
         if (response.ok) {
           const text = await response.text();
-          if (text && text.includes('|')) {
-            raw = text;
+          if (text && (text.includes('|') || text.includes('~'))) {
+            raw = text.trim();
+          }
+        }
+      } catch {
+        // continue
+      }
+    }
+
+    // 4. Try RESTful Object API
+    if (!raw.includes('|') && !raw.includes('~')) {
+      try {
+        const response = await fetch(`https://api.restful-api.dev/objects/${cleanCode}`);
+        if (response.ok) {
+          const obj = await response.json();
+          if (obj && obj.data && obj.data.p && (obj.data.p.includes('|') || obj.data.p.includes('~'))) {
+            raw = obj.data.p;
           }
         }
       } catch {

@@ -524,11 +524,11 @@ export const TimetableShareModal: React.FC<TimetableShareModalProps> = ({
                   type="text"
                   value={importCode}
                   onChange={(e) => setImportCode(e.target.value)}
-                  placeholder="e.g. BK-A8F3, short code, or URL"
+                  placeholder="e.g. BK-7H7vg, short code, or URL"
                   className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-3.5 rounded-xl text-base font-mono font-bold tracking-wider outline-none focus:border-blue-500 text-slate-900 dark:text-white text-center"
                 />
                 <p className="text-[10px] text-slate-400 mt-1 text-center">
-                  Enter 6-letter short code, scan QR, or paste link
+                  Enter 7-8 letter short code (e.g. BK-7H7vg), scan QR, or paste link
                 </p>
               </div>
 
