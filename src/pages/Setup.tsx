@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type { Subject } from '../lib/types';
 import { sanitizeName } from '../lib/validation';
 import { AppModal } from '../components/AppModal';
+import { TimetableShareModal } from '../components/TimetableShareModal';
 
 const Setup: React.FC = () => {
   const { addSubject } = useSubjects();
@@ -12,6 +13,7 @@ const Setup: React.FC = () => {
   
   const [step, setStep] = useState(1);
   const [tempSubjects, setTempSubjects] = useState<Subject[]>([]);
+  const [showImportModal, setShowImportModal] = useState(false);
   
   // Current subject being added
   const [name, setName] = useState('');
@@ -168,8 +170,8 @@ const Setup: React.FC = () => {
 
       {step === 2 && (
         <div className="flex-1 animate-in fade-in slide-in-from-right duration-300 max-h-[80vh] overflow-y-auto pr-1">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-bold">Add Atleast One Subject to Begin</h2>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-bold">Add Subjects</h2>
             <button 
               onClick={() => setStep(1)}
               className="text-slate-500 text-xs font-bold uppercase tracking-widest flex items-center gap-1"
@@ -179,6 +181,25 @@ const Setup: React.FC = () => {
               </svg>
               Back
             </button>
+          </div>
+
+          {/* Quick Import from Classmate Banner */}
+          <div 
+            onClick={() => setShowImportModal(true)}
+            className="mb-6 bg-gradient-to-r from-blue-600/10 via-indigo-600/10 to-purple-600/10 border border-blue-500/25 p-3.5 rounded-2xl flex items-center justify-between cursor-pointer hover:border-blue-500/40 active:scale-[0.99] transition-all shadow-sm"
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-xl">⚡</span>
+              <div>
+                <p className="text-xs font-black text-blue-600 dark:text-blue-400 uppercase tracking-wider">
+                  Got a Code / QR from a Classmate?
+                </p>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  Import your section's entire timetable in 1 second
+                </p>
+              </div>
+            </div>
+            <span className="text-xs font-bold text-blue-600 dark:text-blue-400">Import →</span>
           </div>
           
           <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 mb-8">
@@ -216,7 +237,7 @@ const Setup: React.FC = () => {
                     <option value="lab">Lab</option>
                   </select>
                   <p className="text-[10px] text-slate-500 mt-1 italic">
-                    Mark as lab to display as a 2-hour slot. Does not affect attendance count.
+                    Lab sessions count as 2 classes in attendance and bunk calculations.
                   </p>
                 </div>
                 <div className="flex-1">
@@ -375,6 +396,12 @@ const Setup: React.FC = () => {
           onCancel={modal.onCancel}
         />
       )}
+
+      {/* Timetable Share & Import Modal */}
+      <TimetableShareModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+      />
     </div>
   );
 };

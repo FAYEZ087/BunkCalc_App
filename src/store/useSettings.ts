@@ -7,6 +7,7 @@ interface SettingsState {
   archivedSemesters: ArchivedSemester[];
   setSettings: (settings: AppSettings) => void;
   addHoliday: (holiday: Holiday) => void;
+  updateHoliday: (holiday: Holiday) => void;
   deleteHoliday: (id: string) => void;
   loadSettings: () => Promise<void>;
   loadArchivedSemesters: () => Promise<void>;
@@ -33,12 +34,21 @@ const defaultSettings: AppSettings = {
 export const useSettings = create<SettingsState>((set, get) => ({
   settings: defaultSettings,
   archivedSemesters: [],
-  setSettings: (settings) => {
+  setSettings: async (settings) => {
     set({ settings });
-    saveToStorage('app_settings', settings);
+    await saveToStorage('app_settings', settings);
     applyTheme(settings.theme, settings.themeAccent);
+
+    try {
+      const { scheduleDailyClassReminders } = await import('../lib/notifications');
+      const { useSubjects } = await import('./useSubjects');
+      const { useAttendance } = await import('./useAttendance');
+      await scheduleDailyClassReminders(useSubjects.getState().subjects, settings, useAttendance.getState().records);
+    } catch (err) {
+      console.warn('Failed to sync reminders on settings change:', err);
+    }
   },
-  addHoliday: (holiday) => {
+  addHoliday: async (holiday) => {
     const currentSettings = get().settings;
     const currentHolidays = currentSettings.holidays || [];
     const updatedSettings: AppSettings = {
@@ -46,9 +56,37 @@ export const useSettings = create<SettingsState>((set, get) => ({
       holidays: [...currentHolidays, holiday],
     };
     set({ settings: updatedSettings });
-    saveToStorage('app_settings', updatedSettings);
+    await saveToStorage('app_settings', updatedSettings);
+
+    try {
+      const { scheduleDailyClassReminders } = await import('../lib/notifications');
+      const { useSubjects } = await import('./useSubjects');
+      const { useAttendance } = await import('./useAttendance');
+      await scheduleDailyClassReminders(useSubjects.getState().subjects, updatedSettings, useAttendance.getState().records);
+    } catch (err) {
+      console.warn('Failed to sync reminders on holiday add:', err);
+    }
   },
-  deleteHoliday: (id) => {
+  updateHoliday: async (holiday) => {
+    const currentSettings = get().settings;
+    const currentHolidays = currentSettings.holidays || [];
+    const updatedSettings: AppSettings = {
+      ...currentSettings,
+      holidays: currentHolidays.map((h) => (h.id === holiday.id ? holiday : h)),
+    };
+    set({ settings: updatedSettings });
+    await saveToStorage('app_settings', updatedSettings);
+
+    try {
+      const { scheduleDailyClassReminders } = await import('../lib/notifications');
+      const { useSubjects } = await import('./useSubjects');
+      const { useAttendance } = await import('./useAttendance');
+      await scheduleDailyClassReminders(useSubjects.getState().subjects, updatedSettings, useAttendance.getState().records);
+    } catch (err) {
+      console.warn('Failed to sync reminders on holiday update:', err);
+    }
+  },
+  deleteHoliday: async (id) => {
     const currentSettings = get().settings;
     const currentHolidays = currentSettings.holidays || [];
     const updatedSettings: AppSettings = {
@@ -56,7 +94,16 @@ export const useSettings = create<SettingsState>((set, get) => ({
       holidays: currentHolidays.filter((h) => h.id !== id),
     };
     set({ settings: updatedSettings });
-    saveToStorage('app_settings', updatedSettings);
+    await saveToStorage('app_settings', updatedSettings);
+
+    try {
+      const { scheduleDailyClassReminders } = await import('../lib/notifications');
+      const { useSubjects } = await import('./useSubjects');
+      const { useAttendance } = await import('./useAttendance');
+      await scheduleDailyClassReminders(useSubjects.getState().subjects, updatedSettings, useAttendance.getState().records);
+    } catch (err) {
+      console.warn('Failed to sync reminders on holiday delete:', err);
+    }
   },
   loadSettings: async () => {
     const stored = await getFromStorage<AppSettings>('app_settings');

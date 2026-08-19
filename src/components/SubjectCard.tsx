@@ -146,7 +146,13 @@ const SubjectCard: React.FC<Props> = ({ subject, onClick, onEdit, onDelete }) =>
           ) : (
             <>
               <p className="text-slate-400 dark:text-slate-500 text-xs uppercase tracking-wider mb-1">Bunk Budget</p>
-              <p className="text-xl font-bold text-green-600 dark:text-green-500">
+              <p className={`text-xl font-bold ${
+                stats.bunkBudget > 2 
+                  ? 'text-green-600 dark:text-green-500' 
+                  : stats.bunkBudget > 0 
+                  ? 'text-amber-500' 
+                  : 'text-amber-600 dark:text-amber-400'
+              }`}>
                 {stats.bunkBudget} {stats.bunkBudget === 1 ? 'class' : 'classes'}
               </p>
             </>

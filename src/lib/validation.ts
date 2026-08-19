@@ -289,7 +289,7 @@ export function validateImportPayload(data: unknown): { valid: boolean; error?: 
   }
 
   // Validate archived_semesters (optional)
-  let sanitizedArchived: any[] = [];
+  const sanitizedArchived: any[] = [];
   if (payload.archived_semesters !== undefined) {
     if (!Array.isArray(payload.archived_semesters)) {
       return { valid: false, error: '"archived_semesters" must be an array.' };

@@ -7,11 +7,13 @@ import HelpTooltip from '../components/HelpTooltip';
 import ThemedIcon from '../components/ThemedIcon';
 import SkeletonLoader from '../components/SkeletonLoader';
 import { v4 as uuidv4 } from 'uuid';
-import type { ArchivedSemester } from '../lib/types';
+import type { ArchivedSemester, Holiday } from '../lib/types';
 import { calculateSubjectStats } from '../lib/calculations';
 import { AppModal } from '../components/AppModal';
 import { sanitizeName, validateArchiveName } from '../lib/validation';
 import { ensureNotificationPermission } from '../lib/permissions';
+import { parseICSFile, HOLIDAY_PRESETS } from '../lib/icsParser';
+import { TimetableShareModal } from '../components/TimetableShareModal';
 
 const LegalModal = lazy(() => import('../components/LegalModal'));
 const FaqSection = lazy(() => import('../components/FaqSection'));
@@ -19,16 +21,17 @@ const FaqSection = lazy(() => import('../components/FaqSection'));
 import { Share } from '@capacitor/share';
 
 const Settings: React.FC = () => {
-  const { settings, setSettings, addHoliday, deleteHoliday, archivedSemesters, archiveSemester, deleteArchivedSemester } = useSettings();
+  const { settings, setSettings, addHoliday, updateHoliday, deleteHoliday, archivedSemesters, archiveSemester, deleteArchivedSemester } = useSettings();
   const { subjects, deleteSubject } = useSubjects();
   const { records } = useAttendance();
   const [legal, setLegal] = useState<{ title: string; type: 'privacy' | 'terms' } | null>(null);
   const [showArchiveModal, setShowArchiveModal] = useState(false);
   const [archiveName, setArchiveName] = useState('');
   const [showArchivedList, setShowArchivedList] = useState(false);
-  const [showWhatsNew, setShowWhatsNew] = useState(false);
+  const [showTimetableShare, setShowTimetableShare] = useState(false);
 
   // Holiday Manager State
+  const [editingHoliday, setEditingHoliday] = useState<Holiday | null>(null);
   const [holidayName, setHolidayName] = useState('');
   const [holidayStart, setHolidayStart] = useState('');
   const [holidayEnd, setHolidayEnd] = useState('');
@@ -167,7 +170,7 @@ const Settings: React.FC = () => {
         try {
           await clearAllStorage();
           window.location.reload();
-        } catch (err) {
+        } catch {
           setModal({
             isOpen: true,
             title: "Reset Failed",
@@ -208,8 +211,8 @@ const Settings: React.FC = () => {
       return;
     }
 
-    const totalAttended = subjects.reduce((acc, s) => acc + calculateSubjectStats(s, records).attendedCount, 0);
-    const totalClasses = subjects.reduce((acc, s) => acc + calculateSubjectStats(s, records).totalClasses, 0);
+    const totalAttended = subjects.reduce((acc, s) => acc + calculateSubjectStats(s, records, settings.semesterEndDate, settings.holidays).attendedCount, 0);
+    const totalClasses = subjects.reduce((acc, s) => acc + calculateSubjectStats(s, records, settings.semesterEndDate, settings.holidays).totalClasses, 0);
     const overallPct = totalClasses === 0 ? 100 : (totalAttended / totalClasses) * 100;
 
     const archived: ArchivedSemester = {
@@ -236,117 +239,6 @@ const Settings: React.FC = () => {
       <header className="mb-8">
         <h1 className="text-2xl font-bold">Settings</h1>
       </header>
-
-      {/* What's New in v2.0.0 Collapsible Menu */}
-      <section className="mb-8">
-        <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 rounded-3xl p-5 text-white shadow-xl relative overflow-hidden transition-all duration-300">
-          <button 
-            onClick={() => setShowWhatsNew(!showWhatsNew)}
-            className="w-full flex items-center justify-between text-left group cursor-pointer"
-          >
-            <div className="flex items-center gap-3">
-              <div className="bg-white/20 p-2.5 rounded-2xl flex items-center justify-center">
-                <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
-                </svg>
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="bg-white/20 text-white text-[9px] font-black uppercase px-2 py-0.5 rounded-full tracking-widest">
-                    v2.0.0 Release
-                  </span>
-                </div>
-                <h2 className="text-base font-black text-white mt-0.5">What's New Summary</h2>
-              </div>
-            </div>
-            <div className="bg-white/10 group-hover:bg-white/20 p-2 rounded-xl transition-all">
-              <svg className={`w-4 h-4 text-white transition-transform duration-300 ${showWhatsNew ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
-              </svg>
-            </div>
-          </button>
-
-          {showWhatsNew && (
-            <div className="mt-4 pt-4 border-t border-white/15 space-y-3 text-xs animate-in fade-in duration-200">
-              <p className="text-[11px] text-blue-100 mb-3 leading-relaxed">
-                7 major features & 15+ stability fixes added to BunkCalc:
-              </p>
-
-              <div className="space-y-3 bg-black/20 rounded-2xl p-4 backdrop-blur-sm border border-white/10">
-                <div className="flex items-start gap-3">
-                  <div className="p-1.5 rounded-lg bg-blue-500/30 text-white shrink-0 mt-0.5">
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
-                  </div>
-                  <div>
-                    <p className="font-bold text-white">Weekly Attendance Trends</p>
-                    <p className="text-[11px] text-blue-100">8-week visual bar chart on the Statistics page.</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <div className="p-1.5 rounded-lg bg-purple-500/30 text-white shrink-0 mt-0.5">
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-                  </div>
-                  <div>
-                    <p className="font-bold text-white">"What-If" Bunk Simulator</p>
-                    <p className="text-[11px] text-blue-100">Predict your exact percentage before skipping upcoming classes.</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <div className="p-1.5 rounded-lg bg-indigo-500/30 text-white shrink-0 mt-0.5">
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                  </div>
-                  <div>
-                    <p className="font-bold text-white">Semester Progress Bar</p>
-                    <p className="text-[11px] text-blue-100">Real-time timeline tracking weeks remaining on your dashboard.</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <div className="p-1.5 rounded-lg bg-emerald-500/30 text-white shrink-0 mt-0.5">
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                  </div>
-                  <div>
-                    <p className="font-bold text-white">Swipe-to-Undo & Re-mark</p>
-                    <p className="text-[11px] text-blue-100">Re-swipe marked subject cards anytime to update status.</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <div className="p-1.5 rounded-lg bg-green-500/30 text-white shrink-0 mt-0.5">
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                  </div>
-                  <div>
-                    <p className="font-bold text-white">CSV & PDF Exports</p>
-                    <p className="text-[11px] text-blue-100">Download attendance records as CSV spreadsheets or printable PDFs.</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <div className="p-1.5 rounded-lg bg-cyan-500/30 text-white shrink-0 mt-0.5">
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
-                  </div>
-                  <div>
-                    <p className="font-bold text-white">History Search & Filters</p>
-                    <p className="text-[11px] text-blue-100">Filter your logs by subject, status, or date range in Global History.</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <div className="p-1.5 rounded-lg bg-teal-500/30 text-white shrink-0 mt-0.5">
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
-                  </div>
-                  <div>
-                    <p className="font-bold text-white">Safety & Performance Overhaul</p>
-                    <p className="text-[11px] text-blue-100">Delete confirmations, accurate timezone dates, and instant page loads.</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </section>
 
       <section className="mb-8">
         <h2 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-4">Academic</h2>
@@ -422,11 +314,29 @@ const Settings: React.FC = () => {
             Add official college holidays or exam breaks. Dates inside these ranges are automatically excluded from your remaining class budget.
           </p>
 
-          <div className="space-y-3 bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700">
+          <div className="bg-slate-100 dark:bg-slate-800 p-4 rounded-xl space-y-3">
+            {editingHoliday && (
+              <div className="flex justify-between items-center bg-blue-500/10 border border-blue-500/20 px-3 py-1.5 rounded-lg text-xs text-blue-600 dark:text-blue-400 font-bold">
+                <span>✏️ Editing "{editingHoliday.name}"</span>
+                <button 
+                  onClick={() => {
+                    setEditingHoliday(null);
+                    setHolidayName('');
+                    setHolidayStart('');
+                    setHolidayEnd('');
+                  }}
+                  className="text-[10px] underline hover:text-blue-700 dark:hover:text-blue-300"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
             <div>
-              <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">Holiday / Exam Name</label>
+              <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
+                {editingHoliday ? 'Edit Break Name' : 'Break Name'}
+              </label>
               <input 
-                placeholder="e.g. Durga Puja Break or Mid-Sem Exams"
+                placeholder="e.g. Diwali Vacation" 
                 value={holidayName}
                 onChange={(e) => setHolidayName(e.target.value)}
                 className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-2 text-xs font-bold outline-none focus:border-blue-500 text-slate-900 dark:text-white"
@@ -455,25 +365,150 @@ const Settings: React.FC = () => {
                 />
               </div>
             </div>
-            <button 
-              disabled={!holidayName.trim() || !holidayStart || !holidayEnd}
-              onClick={() => {
-                const sanitized = sanitizeName(holidayName);
-                if (!sanitized) return;
-                addHoliday({
-                  id: uuidv4(),
-                  name: sanitized,
-                  startDate: holidayStart,
-                  endDate: holidayEnd >= holidayStart ? holidayEnd : holidayStart,
-                });
-                setHolidayName('');
-                setHolidayStart('');
-                setHolidayEnd('');
-              }}
-              className="w-full bg-blue-600 hover:bg-blue-500 text-white py-2.5 rounded-lg text-xs font-black uppercase tracking-wider disabled:opacity-50 transition-all"
-            >
-              + Add Holiday Break
-            </button>
+            
+            {editingHoliday ? (
+              <div className="flex gap-2">
+                <button 
+                  disabled={!holidayName.trim() || !holidayStart || !holidayEnd}
+                  onClick={() => {
+                    const sanitized = sanitizeName(holidayName);
+                    if (!sanitized) return;
+                    updateHoliday({
+                      id: editingHoliday.id,
+                      name: sanitized,
+                      startDate: holidayStart,
+                      endDate: holidayEnd >= holidayStart ? holidayEnd : holidayStart,
+                    });
+                    setEditingHoliday(null);
+                    setHolidayName('');
+                    setHolidayStart('');
+                    setHolidayEnd('');
+                  }}
+                  className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white py-2.5 rounded-lg text-xs font-black uppercase tracking-wider disabled:opacity-50 transition-all shadow-md shadow-emerald-500/20"
+                >
+                  ✓ Save Changes
+                </button>
+                <button
+                  onClick={() => {
+                    setEditingHoliday(null);
+                    setHolidayName('');
+                    setHolidayStart('');
+                    setHolidayEnd('');
+                  }}
+                  className="px-4 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-lg text-xs font-bold transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <button 
+                disabled={!holidayName.trim() || !holidayStart || !holidayEnd}
+                onClick={() => {
+                  const sanitized = sanitizeName(holidayName);
+                  if (!sanitized) return;
+                  addHoliday({
+                    id: uuidv4(),
+                    name: sanitized,
+                    startDate: holidayStart,
+                    endDate: holidayEnd >= holidayStart ? holidayEnd : holidayStart,
+                  });
+                  setHolidayName('');
+                  setHolidayStart('');
+                  setHolidayEnd('');
+                }}
+                className="w-full bg-blue-600 hover:bg-blue-500 text-white py-2.5 rounded-lg text-xs font-black uppercase tracking-wider disabled:opacity-50 transition-all shadow-md shadow-blue-500/20"
+              >
+                + Add Holiday Break
+              </button>
+            )}
+
+            {/* Academic Calendar Presets & ICS Import */}
+            <div className="pt-3 border-t border-slate-200 dark:border-slate-700/60 flex flex-col gap-2">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                Quick Calendar Presets & Import
+              </span>
+              <div className="flex gap-2">
+                <select
+                  onChange={(e) => {
+                    const presetIndex = Number(e.target.value);
+                    if (isNaN(presetIndex) || presetIndex < 0) return;
+                    const preset = HOLIDAY_PRESETS[presetIndex];
+                    if (!preset) return;
+                    preset.holidays.forEach(h => {
+                      addHoliday({
+                        id: uuidv4(),
+                        name: h.name,
+                        startDate: h.startDate,
+                        endDate: h.endDate,
+                      });
+                    });
+                    setModal({
+                      isOpen: true,
+                      title: "Preset Applied",
+                      message: `Added ${preset.holidays.length} holiday breaks from "${preset.name}".`,
+                      type: "success",
+                      confirmText: "Great!",
+                      onConfirm: () => setModal(null)
+                    });
+                    e.target.value = "";
+                  }}
+                  defaultValue=""
+                  className="flex-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-2 text-xs font-bold outline-none text-slate-900 dark:text-white"
+                >
+                  <option value="" disabled>⚡ Load Indian College Presets</option>
+                  {HOLIDAY_PRESETS.map((p, idx) => (
+                    <option key={idx} value={idx}>{p.name}</option>
+                  ))}
+                </select>
+
+                <label className="bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 px-3 py-2 rounded-lg text-xs font-bold text-slate-700 dark:text-slate-200 cursor-pointer border border-slate-200 dark:border-slate-700 flex items-center gap-1.5 transition-colors">
+                  <span>📅</span> .ics
+                  <input
+                    type="file"
+                    accept=".ics,text/calendar"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      try {
+                        const text = await file.text();
+                        const parsed = parseICSFile(text);
+                        if (parsed.length === 0) {
+                          setModal({
+                            isOpen: true,
+                            title: "No Events Found",
+                            message: "Could not find valid calendar events in this .ics file.",
+                            type: "error",
+                            confirmText: "OK",
+                            onConfirm: () => setModal(null)
+                          });
+                          return;
+                        }
+                        parsed.forEach(h => addHoliday(h));
+                        setModal({
+                          isOpen: true,
+                          title: "Calendar Imported",
+                          message: `Successfully imported ${parsed.length} academic holidays from your .ics file!`,
+                          type: "success",
+                          confirmText: "Done",
+                          onConfirm: () => setModal(null)
+                        });
+                      } catch {
+                        setModal({
+                          isOpen: true,
+                          title: "Import Error",
+                          message: "Failed to parse the calendar file.",
+                          type: "error",
+                          confirmText: "OK",
+                          onConfirm: () => setModal(null)
+                        });
+                      }
+                      e.target.value = '';
+                    }}
+                  />
+                </label>
+              </div>
+            </div>
           </div>
 
           {/* List of Configured Holidays */}
@@ -482,19 +517,56 @@ const Settings: React.FC = () => {
               <p className="text-center text-xs text-slate-400 dark:text-slate-600 italic py-2">No holidays configured.</p>
             ) : (
               settings.holidays.map((h) => (
-                <div key={h.id} className="flex justify-between items-center bg-white dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-slate-700 text-xs">
+                <div 
+                  key={h.id} 
+                  className={`flex justify-between items-center bg-white dark:bg-slate-800 p-3 rounded-xl border text-xs transition-all ${
+                    editingHoliday?.id === h.id 
+                      ? 'border-blue-500 ring-2 ring-blue-500/20 shadow-md' 
+                      : 'border-slate-200 dark:border-slate-700'
+                  }`}
+                >
                   <div>
-                    <p className="font-bold text-slate-900 dark:text-white">{h.name}</p>
+                    <p className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                      {h.name}
+                      {editingHoliday?.id === h.id && (
+                        <span className="text-[9px] bg-blue-500 text-white px-1.5 py-0.2 rounded-full font-bold">Editing</span>
+                      )}
+                    </p>
                     <p className="text-[10px] text-slate-500">{h.startDate} to {h.endDate}</p>
                   </div>
-                  <button 
-                    onClick={() => deleteHoliday(h.id)}
-                    className="text-red-500 p-1.5 hover:bg-red-500/10 rounded-lg transition-colors"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button 
+                      onClick={() => {
+                        setEditingHoliday(h);
+                        setHolidayName(h.name);
+                        setHolidayStart(h.startDate);
+                        setHolidayEnd(h.endDate);
+                      }}
+                      title="Edit Holiday"
+                      className="text-blue-500 hover:text-blue-600 p-1.5 hover:bg-blue-500/10 rounded-lg transition-colors"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                    </button>
+                    <button 
+                      onClick={() => {
+                        if (editingHoliday?.id === h.id) {
+                          setEditingHoliday(null);
+                          setHolidayName('');
+                          setHolidayStart('');
+                          setHolidayEnd('');
+                        }
+                        deleteHoliday(h.id);
+                      }}
+                      title="Delete Holiday"
+                      className="text-red-500 hover:text-red-600 p-1.5 hover:bg-red-500/10 rounded-lg transition-colors"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
                 </div>
               ))
             )}
@@ -733,6 +805,21 @@ const Settings: React.FC = () => {
           </button>
         </div>
 
+        {/* Share / Import Class Timetable */}
+        <button
+          onClick={() => setShowTimetableShare(true)}
+          className="w-full mt-4 bg-blue-500/10 border border-blue-500/30 p-4 rounded-2xl flex items-center justify-between hover:bg-blue-500/20 active:scale-[0.99] transition-all"
+        >
+          <div className="flex items-center gap-3 text-left">
+            <span className="text-xl">📅</span>
+            <div>
+              <p className="text-sm font-bold text-blue-600 dark:text-blue-400">Class Timetable Share & Import</p>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400">Generate QR code for batch or import friends' schedule</p>
+            </div>
+          </div>
+          <span className="text-xs font-bold text-blue-600 dark:text-blue-400">Open →</span>
+        </button>
+
         {/* Archive Semester Button */}
         <button
           onClick={() => setShowArchiveModal(true)}
@@ -881,7 +968,7 @@ const Settings: React.FC = () => {
           </button>
 
           <a 
-            href="https://github.com/FAYEZ087"
+            href="https://github.com/PinecoXZ"
             target="_blank"
             rel="noopener noreferrer"
             className="w-full p-4 flex justify-between items-center hover:bg-slate-100 dark:hover:bg-slate-800/50 transition-colors"
@@ -893,8 +980,8 @@ const Settings: React.FC = () => {
                 </svg>
               </div>
               <div>
-                <p className="text-sm font-bold text-slate-900 dark:text-white">Developer (FAYEZ087)</p>
-                <p className="text-[10px] text-slate-500 dark:text-slate-400">Visit GitHub profile @FAYEZ087</p>
+                <p className="text-sm font-bold text-slate-900 dark:text-white">Developer (PinecoXZ)</p>
+                <p className="text-[10px] text-slate-500 dark:text-slate-400">Visit GitHub profile @PinecoXZ</p>
               </div>
             </div>
             <ThemedIcon name="chevronRight" size={16} className="text-slate-400 dark:text-slate-600" />
@@ -921,7 +1008,7 @@ const Settings: React.FC = () => {
           </button>
           <div className="p-4 flex justify-between items-center">
             <span className="font-bold text-slate-500 dark:text-slate-400">App Version</span>
-            <span className="text-slate-500 dark:text-slate-400 font-black tracking-widest uppercase text-xs">v2.0.0</span>
+            <span className="text-slate-500 dark:text-slate-400 font-black tracking-widest uppercase text-xs">v2.1.0</span>
           </div>
         </div>
       </section>
@@ -940,13 +1027,13 @@ const Settings: React.FC = () => {
       <footer className="mt-12 pt-8 pb-4 border-t border-slate-200/50 dark:border-slate-800/50 text-center space-y-2">
         <div className="inline-flex items-center gap-2 bg-blue-500/10 dark:bg-blue-500/15 border border-blue-500/20 px-3 py-1 rounded-full">
           <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
-          <span className="text-[11px] font-black uppercase tracking-widest text-blue-600 dark:text-blue-400">BunkCalc v2.0.0</span>
+          <span className="text-[11px] font-black uppercase tracking-widest text-blue-600 dark:text-blue-400">BunkCalc v2.1.0</span>
         </div>
         <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-          Made with ❤️ by <a href="https://github.com/FAYEZ087" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">FAYEZ087</a> for KIITians
+          Made by <a href="https://github.com/PinecoXZ" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">PinecoXZ</a> for KIITians
         </p>
         <p className="text-[9px] font-bold text-slate-400 dark:text-slate-600 uppercase tracking-widest">
-          © 2026 BunkCalc &bull; Smart Attendance & Bunk Budgeting Engine
+          &copy; 2026 BunkCalc &bull; Smart Attendance & Bunk Budgeting Engine
         </p>
       </footer>
 
@@ -994,6 +1081,12 @@ const Settings: React.FC = () => {
           onCancel={modal.onCancel}
         />
       )}
+
+      {/* Timetable Share & Import Modal */}
+      <TimetableShareModal
+        isOpen={showTimetableShare}
+        onClose={() => setShowTimetableShare(false)}
+      />
     </div>
   );
 };

@@ -21,11 +21,11 @@ const LegalModal: React.FC<Props> = ({ title, type, onClose }) => {
       <div className="flex-1 overflow-y-auto p-6 text-slate-600 dark:text-slate-300 text-sm leading-relaxed space-y-6">
         {type === 'privacy' ? (
           <>
-            <p className="text-slate-500 dark:text-slate-400 text-xs italic">Effective Date: August 15, 2026 &bull; Version 2.0.0</p>
+            <p className="text-slate-500 dark:text-slate-400 text-xs italic">Effective Date: August 19, 2026 &bull; Version 2.1.0</p>
             
             <section>
               <h3 className="text-slate-900 dark:text-white font-bold text-lg mb-2">1. Introduction</h3>
-              <p>BunkCalc ("the App", "we", "our", "us") is a mobile attendance-tracking application developed and maintained independently in India. This Privacy Policy describes how the App handles information when you install and use BunkCalc on your personal device. By using BunkCalc, you acknowledge that you have read and understood this Privacy Policy.</p>
+              <p>BunkCalc ("the App", "we", "our", "us") is an attendance-tracking application developed by <a href="https://github.com/PinecoXZ" target="_blank" rel="noopener noreferrer" className="text-blue-500 font-bold underline">PinecoXZ</a>. This Privacy Policy describes how the App handles information when you use BunkCalc on the web (https://bunk-calc-web.vercel.app/) or personal device. By using BunkCalc, you acknowledge that you have read and understood this Privacy Policy.</p>
             </section>
 
             <section>
@@ -104,11 +104,11 @@ const LegalModal: React.FC<Props> = ({ title, type, onClose }) => {
           </>
         ) : (
           <>
-            <p className="text-slate-500 dark:text-slate-400 text-xs italic">Effective Date: August 15, 2026 &bull; Version 2.0.0</p>
+            <p className="text-slate-500 dark:text-slate-400 text-xs italic">Effective Date: August 19, 2026 &bull; Version 2.1.0</p>
             
             <section>
               <h3 className="text-slate-900 dark:text-white font-bold text-lg mb-2">1. Acceptance of Terms</h3>
-              <p>By downloading, installing, or using BunkCalc ("the App"), you ("the User") agree to be bound by these Terms of Service ("Terms"). If you do not agree to these Terms, you must not use the App. These Terms constitute a legally binding agreement between you and BunkCalc.</p>
+              <p>By using BunkCalc ("the App") on the web (https://bunk-calc-web.vercel.app/) or on your device, you agree to be bound by these Terms of Service developed by <a href="https://github.com/PinecoXZ" target="_blank" rel="noopener noreferrer" className="text-blue-500 font-bold underline">PinecoXZ</a>. If you do not agree to these Terms, you must not use the App.</p>
             </section>
             
             <section>
@@ -205,7 +205,7 @@ const LegalModal: React.FC<Props> = ({ title, type, onClose }) => {
           </>
         )}
         <div className="pt-10 pb-10 text-center text-slate-400 dark:text-slate-500 text-[10px]">
-          Last Updated: August 15, 2026 &bull; BunkCalc v2.0.0
+          Last Updated: August 19, 2026 &bull; BunkCalc v2.1.0 &bull; <a href="https://github.com/PinecoXZ" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">PinecoXZ</a>
         </div>
       </div>
     </div>

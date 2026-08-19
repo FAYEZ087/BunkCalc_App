@@ -12,6 +12,8 @@ import { calculateSubjectStats } from '../lib/calculations';
 import type { Subject } from '../lib/types';
 import SemesterProgress from '../components/SemesterProgress';
 import { UpdateBanner } from '../components/UpdateBanner';
+import { WeeklyStrategyModal } from '../components/WeeklyStrategyModal';
+import { TimetableShareModal } from '../components/TimetableShareModal';
 
 // Lazy loaded heavy components
 const TimetableGrid = lazy(() => import('../components/TimetableGrid'));
@@ -31,6 +33,8 @@ const Home: React.FC<Props> = ({ onSelectSubject, onOpenCalendar }) => {
   const [modalMode, setModalMode] = useState<'none' | 'add' | 'edit'>('none');
   const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
   const [viewMode, setViewMode] = useState<'dashboard' | 'timetable'>('dashboard');
+  const [showWeeklyStrategy, setShowWeeklyStrategy] = useState(false);
+  const [showTimetableShare, setShowTimetableShare] = useState(false);
   const [now, setNow] = useState(new Date());
 
   // Update clock every minute
@@ -86,7 +90,7 @@ const Home: React.FC<Props> = ({ onSelectSubject, onOpenCalendar }) => {
     const currentMins = now.getHours() * 60 + now.getMinutes();
 
     let live: { subject: Subject; time: string; endMins: number } | null = null;
-    let upcoming: { subject: Subject; time: string; startMins: number }[] = [];
+    const upcoming: { subject: Subject; time: string; startMins: number }[] = [];
 
     subjects.forEach((s) => {
       s.schedule.forEach((slot) => {
@@ -158,6 +162,14 @@ const Home: React.FC<Props> = ({ onSelectSubject, onOpenCalendar }) => {
             </div>
           )}
           <button
+            onClick={() => setShowTimetableShare(true)}
+            className="bg-slate-50 dark:bg-slate-900 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-lg active:scale-90 transition-transform"
+            aria-label="Share or Import Timetable"
+            title="Share or Import Timetable"
+          >
+            <span className="text-lg">📤</span>
+          </button>
+          <button
             onClick={onOpenCalendar}
             className="bg-slate-50 dark:bg-slate-900 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-lg active:scale-90 transition-transform"
             aria-label="Open Calendar"
@@ -175,6 +187,32 @@ const Home: React.FC<Props> = ({ onSelectSubject, onOpenCalendar }) => {
       </header>
 
       <AlertBanner subjects={subjects} />
+
+      {/* Weekly Strategy Quick Action Card */}
+      {subjects.length > 0 && (
+        <div
+          onClick={() => setShowWeeklyStrategy(true)}
+          className="mb-6 bg-gradient-to-r from-blue-600/10 via-indigo-600/10 to-violet-600/10 dark:from-blue-900/20 dark:via-indigo-900/20 dark:to-violet-900/20 border border-blue-500/20 dark:border-blue-500/30 rounded-2xl p-3.5 flex items-center justify-between cursor-pointer hover:border-blue-500/40 active:scale-[0.99] transition-all shadow-sm group"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-blue-600/10 dark:bg-blue-500/20 flex items-center justify-center text-lg">
+              🎯
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider">Weekly Bunk Strategy</span>
+                <span className="bg-blue-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full uppercase">Briefing</span>
+              </div>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                Smart plan for next 7 days • Safe & risky subjects
+              </p>
+            </div>
+          </div>
+          <span className="text-xs font-bold text-blue-600 dark:text-blue-400 group-hover:translate-x-1 transition-transform">
+            View →
+          </span>
+        </div>
+      )}
 
       {/* View Toggle */}
       <div className="flex bg-slate-100 dark:bg-slate-900 p-1 rounded-xl mb-6 border border-slate-200 dark:border-slate-800">
@@ -320,6 +358,18 @@ const Home: React.FC<Props> = ({ onSelectSubject, onOpenCalendar }) => {
           />
         </Suspense>
       )}
+
+      {/* Weekly Strategy Modal */}
+      <WeeklyStrategyModal
+        isOpen={showWeeklyStrategy}
+        onClose={() => setShowWeeklyStrategy(false)}
+      />
+
+      {/* Timetable Share / Import Modal */}
+      <TimetableShareModal
+        isOpen={showTimetableShare}
+        onClose={() => setShowTimetableShare(false)}
+      />
     </div>
   );
 };

@@ -9,12 +9,13 @@ export const countRemainingSessions = (
   semesterEndDate: string,
   records: AttendanceRecord[] = [],
   subjectId?: string,
-  holidays: Holiday[] = []
+  holidays: Holiday[] = [],
+  isLab: boolean = false
 ): number => {
   if (!semesterEndDate || !schedule || schedule.length === 0) return 0;
 
   const parseEndDate = (dateStr: string): Date => {
-    let cleanStr = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
+    const cleanStr = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
     const parts = cleanStr.split('-').map(Number);
     if (parts.length === 3 && !parts.some(isNaN)) {
       return new Date(parts[0], parts[1] - 1, parts[2], 23, 59, 59, 999);
@@ -27,7 +28,7 @@ export const countRemainingSessions = (
   const endDate = parseEndDate(semesterEndDate);
   
   const now = new Date();
-  let current = new Date(now);
+  const current = new Date(now);
   current.setHours(0, 0, 0, 0);
 
   // If today's attendance for this subject has already been marked, skip today's slot in remaining count
@@ -41,6 +42,7 @@ export const countRemainingSessions = (
     }
   }
 
+  const multiplier = isLab ? 2 : 1;
   let sessionCount = 0;
   while (current <= endDate) {
     const currentStr = current.toLocaleDateString('en-CA');
@@ -51,7 +53,7 @@ export const countRemainingSessions = (
     if (!isHoliday) {
       const day = current.getDay();
       const classesOnDay = schedule.filter(s => Number(s.day) === day).length;
-      sessionCount += classesOnDay;
+      sessionCount += classesOnDay * multiplier;
     }
     
     current.setDate(current.getDate() + 1);

@@ -12,19 +12,33 @@ interface SubjectsState {
 
 export const useSubjects = create<SubjectsState>((set, get) => ({
   subjects: [],
-  addSubject: (subject) => {
-    set((state) => {
-      const newSubjects = [...state.subjects, subject];
-      saveToStorage('subjects', newSubjects);
-      return { subjects: newSubjects };
-    });
+  addSubject: async (subject) => {
+    const newSubjects = [...get().subjects, subject];
+    set({ subjects: newSubjects });
+    await saveToStorage('subjects', newSubjects);
+
+    try {
+      const { scheduleDailyClassReminders } = await import('../lib/notifications');
+      const { useAttendance } = await import('./useAttendance');
+      const { useSettings } = await import('./useSettings');
+      await scheduleDailyClassReminders(newSubjects, useSettings.getState().settings, useAttendance.getState().records);
+    } catch (err) {
+      console.error('Failed to reschedule notifications after adding subject:', err);
+    }
   },
-  updateSubject: (subject) => {
-    set((state) => {
-      const newSubjects = state.subjects.map((s) => (s.id === subject.id ? subject : s));
-      saveToStorage('subjects', newSubjects);
-      return { subjects: newSubjects };
-    });
+  updateSubject: async (subject) => {
+    const newSubjects = get().subjects.map((s) => (s.id === subject.id ? subject : s));
+    set({ subjects: newSubjects });
+    await saveToStorage('subjects', newSubjects);
+
+    try {
+      const { scheduleDailyClassReminders } = await import('../lib/notifications');
+      const { useAttendance } = await import('./useAttendance');
+      const { useSettings } = await import('./useSettings');
+      await scheduleDailyClassReminders(newSubjects, useSettings.getState().settings, useAttendance.getState().records);
+    } catch (err) {
+      console.error('Failed to reschedule notifications after updating subject:', err);
+    }
   },
   deleteSubject: async (id) => {
     const newSubjects = get().subjects.filter((s) => s.id !== id);
@@ -32,8 +46,11 @@ export const useSubjects = create<SubjectsState>((set, get) => ({
     await saveToStorage('subjects', newSubjects);
     
     try {
-      const { cancelSubjectNotifications } = await import('../lib/notifications');
+      const { cancelSubjectNotifications, scheduleDailyClassReminders } = await import('../lib/notifications');
       await cancelSubjectNotifications(id);
+      const { useAttendance } = await import('./useAttendance');
+      const { useSettings } = await import('./useSettings');
+      await scheduleDailyClassReminders(newSubjects, useSettings.getState().settings, useAttendance.getState().records);
     } catch (err) {
       console.error('Failed to cancel notifications:', err);
     }

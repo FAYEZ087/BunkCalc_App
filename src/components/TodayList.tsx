@@ -39,15 +39,16 @@ const TodayList: React.FC = () => {
 
   // Helper to determine bunk safety
   const getBunkSafety = (subject: Subject) => {
-    const stats = calculateSubjectStats(subject, records);
-    const threshold = subject.threshold * 100;
-    const warningZone = (subject.threshold + settings.warningBuffer) * 100;
-    
-    const newTotal = stats.totalClasses + 1;
-    const newPct = (stats.attendedCount / newTotal) * 100;
+    const stats = calculateSubjectStats(subject, records, settings.semesterEndDate, settings.holidays);
+    const threshold = (subject.threshold || settings.globalThreshold) * 100;
+    const warningZone = ((subject.threshold || settings.globalThreshold) + settings.warningBuffer) * 100;
 
-    if (newPct < threshold) return { label: 'CRITICAL', color: 'bg-red-500 text-white' };
-    if (newPct <= warningZone) return { label: 'RISKY', color: 'bg-amber-500 text-white' };
+    if (stats.bunkBudget < 0 || (stats.totalClasses > 0 && stats.attendancePct < threshold)) {
+      return { label: 'CRITICAL', color: 'bg-red-500 text-white' };
+    }
+    if (stats.bunkBudget <= 2 || stats.attendancePct <= warningZone) {
+      return { label: 'RISKY', color: 'bg-amber-500 text-white' };
+    }
     return { label: 'SAFE', color: 'bg-green-500 text-white' };
   };
 

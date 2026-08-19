@@ -157,7 +157,7 @@ const SubjectModal: React.FC<Props> = ({ subject, onSave, onCancel }) => {
                 <option value="lab">Lab</option>
               </select>
               <p className="text-[10px] text-slate-500 mt-1 italic">
-                Mark as lab to display as a 2-hour slot. Does not affect attendance count.
+                Lab sessions count as 2 classes in attendance and bunk calculations.
               </p>
             </div>
             <div className="flex-1">

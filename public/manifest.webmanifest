@@ -24,5 +24,21 @@
   "categories": [
     "education",
     "utilities"
+  ],
+  "shortcuts": [
+    {
+      "name": "Today's Schedule",
+      "short_name": "Today",
+      "description": "Mark attendance for today's classes",
+      "url": "/?tab=today",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Weekly Stats",
+      "short_name": "Stats",
+      "description": "Check subject attendance and bunk budgets",
+      "url": "/?tab=stats",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    }
   ]
 }

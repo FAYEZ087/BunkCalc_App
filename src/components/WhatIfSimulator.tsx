@@ -3,7 +3,6 @@ import { useSubjects } from '../store/useSubjects';
 import { useAttendance } from '../store/useAttendance';
 import { useSettings } from '../store/useSettings';
 import { calculateSubjectStats, getStatusColor } from '../lib/calculations';
-import type { AttendanceRecord } from '../lib/types';
 
 const WhatIfSimulator: React.FC = () => {
   const { subjects } = useSubjects();
@@ -27,23 +26,39 @@ const WhatIfSimulator: React.FC = () => {
       settings.holidays
     );
 
-    // Create synthetic records
-    const today = new Date().toISOString().split('T')[0];
-    const syntheticRecords: AttendanceRecord[] = Array.from({ length: bunkCount }).map((_, i) => ({
-      id: `synthetic-${i}`,
-      subjectId: selectedSubject.id,
-      date: today,
-      status: 'absent' as const,
-    }));
+    const multiplier = selectedSubject.isLab ? 2 : 1;
+    const bunkSessions = bunkCount * multiplier;
 
-    const simulatedStats = calculateSubjectStats(
-      selectedSubject,
-      [...records, ...syntheticRecords],
-      settings.semesterEndDate,
-      settings.holidays
-    );
+    const simTotalAttended = currentStats.attendedCount;
+    const simTotalMissed = currentStats.absentCount + bunkSessions;
+    const simTotalClasses = simTotalAttended + simTotalMissed;
+    const simRemainingClasses = Math.max(0, currentStats.remainingClasses - bunkSessions);
+    const simBunkBudget = currentStats.bunkBudget - bunkCount;
+    const simAttendancePct = simTotalClasses === 0 ? 100 : (simTotalAttended / simTotalClasses) * 100;
 
-    const isBelowThreshold = simulatedStats.attendancePct < (selectedSubject.threshold * 100);
+    const threshold = selectedSubject.threshold || settings.globalThreshold;
+    const isBelowThreshold = simAttendancePct < (threshold * 100) || simBunkBudget < 0;
+
+    let simClassesNeededToRecover = 0;
+    if (isBelowThreshold) {
+      const denominator = 1 - threshold;
+      if (denominator > 0) {
+        const numerator = threshold * simTotalMissed - simTotalAttended * (1 - threshold);
+        simClassesNeededToRecover = Math.max(0, Math.ceil(numerator / denominator));
+      }
+    }
+
+    const simulatedStats = {
+      ...currentStats,
+      attendedCount: simTotalAttended,
+      absentCount: simTotalMissed,
+      totalClasses: simTotalClasses,
+      remainingClasses: simRemainingClasses,
+      attendancePct: simAttendancePct,
+      bunkBudget: simBunkBudget,
+      safeBunks: Math.max(0, simBunkBudget),
+      classesNeededToRecover: simClassesNeededToRecover,
+    };
 
     return {
       currentStats,

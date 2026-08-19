@@ -25,14 +25,14 @@ export const calculateSubjectStats = (
   holidays?: Holiday[]
 ): SubjectStats => {
   const subjectRecords = records.filter((r) => r.subjectId === subject.id);
+  const multiplier = subject.isLab ? 2 : 1;
 
   const attendedSoFar = subject.attendedSoFar || 0;
   const missedSoFar = subject.missedSoFar || 0;
-  const pastSessions = attendedSoFar + missedSoFar;
 
-  const recordedAttended = subjectRecords.filter((r) => r.status === 'present').length;
-  const recordedMissed = subjectRecords.filter((r) => r.status === 'absent').length;
-  const cancelledCount = countCancelledSessions(records, subject.id);
+  const recordedAttended = subjectRecords.filter((r) => r.status === 'present').length * multiplier;
+  const recordedMissed = subjectRecords.filter((r) => r.status === 'absent').length * multiplier;
+  const cancelledCount = countCancelledSessions(records, subject.id) * multiplier;
 
   const totalAttended = attendedSoFar + recordedAttended;
   const totalMissed = missedSoFar + recordedMissed;
@@ -40,13 +40,14 @@ export const calculateSubjectStats = (
 
   // Remaining sessions count from dateUtils if semesterEndDate provided, else 0
   const remainingClasses = semesterEndDate
-    ? countRemainingSessions(subject.schedule, semesterEndDate, records, subject.id, holidays || [])
+    ? countRemainingSessions(subject.schedule, semesterEndDate, records, subject.id, holidays || [], !!subject.isLab)
     : 0;
 
-  // Total sessions in semester pool = pastSessions + recorded + remaining - cancelled
+  // Total sessions in semester pool = past attended/missed + recorded attended/missed + remaining future sessions
+  // (Past cancelled classes are already excluded from both totalClasses and remainingClasses)
   const totalSessions = Math.max(
     totalClasses,
-    pastSessions + recordedAttended + recordedMissed + remainingClasses - cancelledCount
+    totalClasses + remainingClasses
   );
 
   const requiredSessions = Math.ceil(totalSessions * subject.threshold);
@@ -58,9 +59,13 @@ export const calculateSubjectStats = (
   // Classes needed to recover if below threshold or negative budget
   let classesNeededToRecover = 0;
   if (bunkBudget < 0 || attendancePct < subject.threshold * 100) {
-    const numerator = subject.threshold * totalMissed - totalAttended * (1 - subject.threshold);
     const denominator = 1 - subject.threshold;
-    classesNeededToRecover = Math.max(0, Math.ceil(numerator / denominator));
+    if (denominator > 0) {
+      const numerator = subject.threshold * totalMissed - totalAttended * (1 - subject.threshold);
+      classesNeededToRecover = Math.max(0, Math.ceil(numerator / denominator));
+    } else {
+      classesNeededToRecover = totalMissed > 0 ? 999 : 0;
+    }
   }
 
   // Max possible % if all remaining sessions are attended

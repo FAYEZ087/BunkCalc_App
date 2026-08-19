@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { AttendanceRecord } from '../lib/types';
 import { saveToStorage, getFromStorage } from '../lib/storage';
-import { handleAttendanceAlerts } from '../lib/notifications';
+import { handleAttendanceAlerts, scheduleDailyClassReminders } from '../lib/notifications';
 import { useSubjects } from './useSubjects';
 import { useSettings } from './useSettings';
 
@@ -39,15 +39,19 @@ export const useAttendance = create<AttendanceState>((set, get) => ({
     await saveToStorage('attendance_records', newRecords);
 
     // Advanced Notifications logic
-    const subject = useSubjects.getState().subjects.find(s => s.id === record.subjectId);
+    const allSubjects = useSubjects.getState().subjects;
+    const settings = useSettings.getState().settings;
+    const subject = allSubjects.find(s => s.id === record.subjectId);
     if (subject) {
       await handleAttendanceAlerts(
         subject, 
         oldRecords, 
         newRecords, 
-        useSettings.getState().settings
+        settings
       );
     }
+    // Re-sync scheduled class reminders to ensure already-marked classes are excluded
+    await scheduleDailyClassReminders(allSubjects, settings, newRecords);
   },
   unmarkAttendance: async (id) => {
     const oldRecords = get().records;
@@ -57,17 +61,20 @@ export const useAttendance = create<AttendanceState>((set, get) => ({
     set({ records: newRecords });
     await saveToStorage('attendance_records', newRecords);
 
+    const allSubjects = useSubjects.getState().subjects;
+    const settings = useSettings.getState().settings;
     if (record) {
-      const subject = useSubjects.getState().subjects.find(s => s.id === record.subjectId);
+      const subject = allSubjects.find(s => s.id === record.subjectId);
       if (subject) {
         await handleAttendanceAlerts(
           subject, 
           oldRecords, 
           newRecords, 
-          useSettings.getState().settings
+          settings
         );
       }
     }
+    await scheduleDailyClassReminders(allSubjects, settings, newRecords);
   },
   undoLastAction: async () => {
     const { lastAction, records } = get();
@@ -85,6 +92,10 @@ export const useAttendance = create<AttendanceState>((set, get) => ({
 
     set({ records: newRecords, lastAction: null });
     await saveToStorage('attendance_records', newRecords);
+
+    const allSubjects = useSubjects.getState().subjects;
+    const settings = useSettings.getState().settings;
+    await scheduleDailyClassReminders(allSubjects, settings, newRecords);
   },
   clearLastAction: () => {
     set({ lastAction: null });
@@ -96,9 +107,10 @@ export const useAttendance = create<AttendanceState>((set, get) => ({
   getStreak: () => {
     const { records } = get();
     const subjects = useSubjects.getState().subjects;
+    const settings = useSettings.getState().settings;
     if (subjects.length === 0 || records.length === 0) return 0;
 
-    // Walk backwards from today counting consecutive days where ALL scheduled classes were 'present' (skip 'cancelled')
+    // Walk backwards from today counting consecutive days where ALL scheduled classes were 'present' (skip 'cancelled' and 'holidays')
     const now = new Date();
     let streak = 0;
 
@@ -107,6 +119,10 @@ export const useAttendance = create<AttendanceState>((set, get) => ({
       checkDate.setDate(checkDate.getDate() - daysBack);
       const dayOfWeek = checkDate.getDay();
       const dateStr = checkDate.toLocaleDateString('en-CA');
+
+      // Check if this date falls within a configured holiday
+      const isHoliday = settings.holidays?.some(h => dateStr >= h.startDate && dateStr <= h.endDate);
+      if (isHoliday) continue; // Skip holidays without breaking streak
 
       // Find subjects scheduled for this day
       const scheduledSubjects = subjects.filter(s =>
